@@ -4,7 +4,7 @@ export type BattleAnimationName = "idle" | "normal-attack" | "guard" | "skill";
 export type BattleAnimation = { frames: string[]; frameDurationsMs: number[]; loop: boolean };
 type FighterAnimations = Partial<Record<BattleAnimationName, BattleAnimation>>;
 
-const root = "/assets/plant%20animation%20sprites/cleaned";
+const root = "/assets/plant-animation-sprites/cleaned";
 const framePaths = (species: CropType, personality: PersonalityType, name: BattleAnimationName, count: number) =>
   Array.from({ length: count }, (_, index) => `${root}/${species}/${personality}/${name}/frame-${String(index + 1).padStart(2, "0")}.png`);
 const animation = (species: CropType, personality: PersonalityType, name: BattleAnimationName, count: number, frameDurationsMs: number[], loop = false): BattleAnimation => ({
