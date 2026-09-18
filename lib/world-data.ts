@@ -60,6 +60,6 @@ const blocked = Array.from({ length: geometry.width * geometry.height }, (_, ind
   return terrainBlocked && !exception;
 });
 export const FIRST_WORLD: WorldDefinition = {
-  ...geometry, background: "/assets/official farm map/Sprout Village.png",
+  ...geometry, background: "/assets/official-farm-map/sprout-village.png",
   start: worldToCell(geometry, { x: 725, y: 590 }), buildings, farmPlots: WORLD_FARM_PLOTS, blocked,
 };
