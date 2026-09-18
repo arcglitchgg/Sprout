@@ -1,13 +1,14 @@
 import { FIRST_WORLD } from "@/lib/world-data";
-import type { CropType, MutationType, PersonalityType } from "@/lib/game-types";
-import type { SproutSaveV1 } from "@/lib/save-types";
+import { TOTAL_FARM_PLOTS } from "@/lib/progression";
+import type { CropType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
+import type { SproutSaveV1, SproutSaveV2 } from "@/lib/save-types";
 
 export const SAVE_KEY = "sprout.save";
-export const CURRENT_SAVE_VERSION = 1;
+export const CURRENT_SAVE_VERSION = 2;
 
 export type SaveLoadResult =
   | { status: "empty" | "invalid" | "future"; save: null }
-  | { status: "loaded"; save: SproutSaveV1 };
+  | { status: "loaded"; save: SproutSaveV2 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const crops: CropType[] = ["potato", "carrot", "corn"];
@@ -27,22 +28,27 @@ function validFarmerTile(value: unknown) {
   return x >= 0 && y >= 0 && x < FIRST_WORLD.width && y < FIRST_WORLD.height && !FIRST_WORLD.blocked[y * FIRST_WORLD.width + x];
 }
 
-export function validateSproutSave(value: unknown): value is SproutSaveV1 {
-  if (!isRecord(value) || value.version !== 1 || !isFiniteNonnegative(value.savedAt) || !isRecord(value.game) || !isRecord(value.world)) return false;
-  const game = value.game;
-  if (!isFiniteNonnegative(game.coins) || !isCrop(game.selectedCrop) || !isRecord(game.seeds)) return false;
-  const seeds = game.seeds;
-  if (!crops.every((crop) => Number.isInteger(seeds[crop]) && (seeds[crop] as number) >= 0)) return false;
-
-  if (!Array.isArray(game.plots) || game.plots.length !== 9) return false;
-  const plotIds = new Set<number>();
-  for (const plot of game.plots) {
-    if (!isRecord(plot) || !Number.isInteger(plot.id) || (plot.id as number) < 0 || (plot.id as number) > 8 || plotIds.has(plot.id as number)) return false;
-    plotIds.add(plot.id as number);
+function validPlots(value: unknown, expectedCount: number) {
+  if (!Array.isArray(value) || value.length !== expectedCount) return false;
+  const ids = new Set<number>();
+  for (const plot of value) {
+    if (!isRecord(plot) || !Number.isInteger(plot.id) || (plot.id as number) < 0 || (plot.id as number) >= expectedCount || ids.has(plot.id as number)) return false;
+    ids.add(plot.id as number);
     if (plot.crop === null) {
       if (plot.plantedAt !== null) return false;
     } else if (!isCrop(plot.crop) || !isFiniteNonnegative(plot.plantedAt)) return false;
   }
+  return true;
+}
+
+function validSharedSave(value: Record<string, unknown>, plotCount: number, requireFarmXp: boolean) {
+  if (!isFiniteNonnegative(value.savedAt) || !isRecord(value.game) || !isRecord(value.world)) return false;
+  const game = value.game;
+  if (!isFiniteNonnegative(game.coins) || !isCrop(game.selectedCrop) || !isRecord(game.seeds)) return false;
+  if (requireFarmXp && !isFiniteNonnegative(game.farmXp)) return false;
+  const seeds = game.seeds;
+  if (!crops.every((crop) => Number.isInteger(seeds[crop]) && (seeds[crop] as number) >= 0)) return false;
+  if (!validPlots(game.plots, plotCount)) return false;
 
   if (!Array.isArray(game.harvestedCrops)) return false;
   const harvestedIds = new Set<string>();
@@ -63,9 +69,41 @@ export function validateSproutSave(value: unknown): value is SproutSaveV1 {
   return validFarmerTile(value.world.farmerTile) && (value.world.facing === "left" || value.world.facing === "right");
 }
 
+export function validateSproutSaveV1(value: unknown): value is SproutSaveV1 {
+  return isRecord(value) && value.version === 1 && validSharedSave(value, 9, false);
+}
+
+export function validateSproutSave(value: unknown): value is SproutSaveV2 {
+  return isRecord(value) && value.version === 2 && validSharedSave(value, TOTAL_FARM_PLOTS, true);
+}
+
+export function migrateV1ToV2(value: unknown): SproutSaveV2 | null {
+  if (!validateSproutSaveV1(value)) return null;
+  const plots: Plot[] = [
+    ...value.game.plots.map((plot) => ({ ...plot })),
+    ...Array.from({ length: TOTAL_FARM_PLOTS - 9 }, (_, index) => ({ id: index + 9, crop: null, plantedAt: null })),
+  ];
+  const migrated: SproutSaveV2 = {
+    version: 2,
+    savedAt: value.savedAt,
+    game: {
+      coins: value.game.coins,
+      farmXp: 0,
+      seeds: { ...value.game.seeds },
+      selectedCrop: value.game.selectedCrop,
+      plots,
+      harvestedCrops: value.game.harvestedCrops.map((item) => ({ ...item })),
+      collection: value.game.collection.map((entry) => ({ ...entry })),
+      fighters: value.game.fighters.map((fighter) => ({ ...fighter })),
+    },
+    world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
+  };
+  return validateSproutSave(migrated) ? migrated : null;
+}
+
 function migrateSupportedSave(value: unknown): unknown {
   if (!isRecord(value)) return value;
-  // Add sequential migrations here when version 2 exists.
+  if (value.version === 1) return migrateV1ToV2(value);
   return value;
 }
 
@@ -96,7 +134,7 @@ export function loadSproutSave(storage?: StorageLike): SaveLoadResult {
   }
 }
 
-export function writeSproutSave(save: SproutSaveV1, storage?: StorageLike) {
+export function writeSproutSave(save: SproutSaveV2, storage?: StorageLike) {
   if (!validateSproutSave(save)) return false;
   const target = storage ?? (typeof window !== "undefined" ? window.localStorage : null);
   if (!target) return false;

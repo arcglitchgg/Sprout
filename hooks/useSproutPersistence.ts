@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSproutSave, writeSproutSave } from "@/lib/save-storage";
-import type { SproutSavePayloadV1, SproutSaveV1 } from "@/lib/save-types";
+import type { SproutSavePayloadV2, SproutSaveV2 } from "@/lib/save-types";
 
 const AUTOSAVE_DELAY_MS = 400;
 
 export function useSproutPersistence() {
-  const [hydration, setHydration] = useState<{ complete: boolean; save: SproutSaveV1 | null }>({ complete: false, save: null });
+  const [hydration, setHydration] = useState<{ complete: boolean; save: SproutSaveV2 | null }>({ complete: false, save: null });
   const canWrite = useRef(false);
-  const latest = useRef<SproutSaveV1 | null>(null);
+  const latest = useRef<SproutSaveV2 | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flush = useCallback(() => {
@@ -38,9 +38,9 @@ export function useSproutPersistence() {
     };
   }, [flush]);
 
-  const scheduleSave = useCallback((payload: SproutSavePayloadV1) => {
+  const scheduleSave = useCallback((payload: SproutSavePayloadV2) => {
     if (!canWrite.current) return;
-    latest.current = { version: 1, savedAt: Date.now(), ...payload };
+    latest.current = { version: 2, savedAt: Date.now(), ...payload };
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, AUTOSAVE_DELAY_MS);
   }, [flush]);

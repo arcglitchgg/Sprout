@@ -6,12 +6,15 @@ import WorldSeedShopPanel from "@/components/WorldSeedShopPanel";
 import WorldDungeonOverlay from "@/components/WorldDungeonOverlay";
 import WorldFarmhouseOverlay from "@/components/WorldFarmhouseOverlay";
 import WorldMarketOverlay from "@/components/WorldMarketOverlay";
+import WorldNotifications from "@/components/WorldNotifications";
+import type { WorldNotification } from "@/components/WorldNotifications";
 import { useWorldMovement } from "@/hooks/useWorldMovement";
 import { FIRST_WORLD } from "@/lib/world-data";
 import { findPath } from "@/lib/pathfinding";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
 import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
+import { getPlotUnlockLevel } from "@/lib/progression";
 import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
@@ -24,6 +27,7 @@ const WORLD_PIXEL_HEIGHT = FIRST_WORLD.pixelHeight;
 
 type Props = {
   coins: number;
+  unlockedPlotCount: number;
   plots: Plot[];
   now: number;
   selectedCrop: CropType;
@@ -37,12 +41,15 @@ type Props = {
   sellCrops: (itemIds: string[]) => void;
   awakenCrop: (itemId: string) => void;
   awardBattleVictory: (result: BattleState) => void;
+  notifications: WorldNotification[];
+  notify: (notification: Omit<WorldNotification, "id">) => void;
+  onDismissNotification: (id: string) => void;
   initialFarmerTile?: WorldPoint;
   initialFarmerFacing?: "left" | "right";
   onFarmerSettled: (tile: WorldPoint, facing: "left" | "right") => void;
 };
 
-export default function PixelWorld({ coins, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, awardBattleVictory, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
+export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: initialFarmerTile, initialFacing: initialFarmerFacing, onSettled: onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
@@ -51,7 +58,6 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
   const [cameraMode, setCameraMode] = useState<CameraMode>("follow");
   const [plantingPlotId, setPlantingPlotId] = useState<number | null>(null);
   const [growingPlotId, setGrowingPlotId] = useState<number | null>(null);
-  const [worldMessage, setWorldMessage] = useState<string | null>(null);
   const [seedShopOpen, setSeedShopOpen] = useState(false);
   const [dungeonOpen, setDungeonOpen] = useState(false);
   const [farmhouseOpen, setFarmhouseOpen] = useState(false);
@@ -90,7 +96,6 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
     cancelInteraction();
     setPlantingPlotId(null);
     setGrowingPlotId(null);
-    setWorldMessage(null);
     setSeedShopOpen(false);
     setFarmhouseOpen(false);
     setMarketOpen(false);
@@ -116,10 +121,14 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
     closeInteraction();
     const worldPlot = FIRST_WORLD.farmPlots.find((plot) => plot.id === plotId);
     if (!worldPlot) return;
+    if (plotId >= unlockedPlotCount) {
+      notify({ kind: "info", title: `Unlocks at Farm Level ${getPlotUnlockLevel(plotId)}` });
+      return;
+    }
     const destination = worldToCell(FIRST_WORLD, worldPlot.approach);
     const route = findPath(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, destination);
     if (!route.length) {
-      setWorldMessage("That plot cannot be reached.");
+      notify({ kind: "error", title: "That plot cannot be reached." });
       return;
     }
     moveTo(destination, () => arriveAtPlot(plotId));
@@ -139,7 +148,7 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
     const entrance = worldToCell(FIRST_WORLD, building.entrance);
     const path = findPath(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, entrance);
     if (!path.length) {
-      setWorldMessage(`${building.label} cannot be reached.`);
+      notify({ kind: "error", title: `${building.label} cannot be reached.` });
       return;
     }
     moveTo(entrance, () => {
@@ -156,7 +165,7 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
     if (!plot) return;
     const message = handlePlotClickRef.current(plot, Date.now());
     if (message) {
-      setWorldMessage(message);
+      notify({ kind: "error", title: message });
       return;
     }
     setPlantingPlotId(null);
@@ -193,8 +202,9 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
       </div>
       <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
-          <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} screenToWorld={screenToWorld} debug={debug} />
+          <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} screenToWorld={screenToWorld} debug={debug} />
         </div>
+        <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
       </div>
 
       {plantingPlot && !plantingPlot.crop && (
@@ -224,8 +234,6 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
           <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close crop status">×</button>
         </div>
       )}
-
-      {worldMessage && <div className="absolute bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-[#fff8dc] px-4 py-2 text-sm font-bold text-[#2f3e2f] shadow-xl">{worldMessage}</div>}
 
       {seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
       {dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}

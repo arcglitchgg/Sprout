@@ -14,7 +14,8 @@
     "test:pathfinding": "node --test tests/pathfinding.test.mjs",
     "test:persistence": "node --test tests/persistence.test.mjs",
     "test:discord": "node --test tests/discord.test.mjs",
-    "test:camera": "node --test tests/camera.test.mjs"
+    "test:camera": "node --test tests/camera.test.mjs",
+    "test:progression": "node --test tests/progression.test.mjs"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",

@@ -5,14 +5,14 @@ import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { CropType, Plot, SeedInventory } from "@/lib/game-types";
 
-export default function Farm({ plots, now, selectedCrop, seeds, handlePlotClick }: { plots: Plot[]; now: number; selectedCrop: CropType; seeds: SeedInventory; handlePlotClick: (plot: Plot, clickedAt: number) => string | null }) {
+export default function Farm({ plots, unlockedPlotCount, now, selectedCrop, seeds, handlePlotClick }: { plots: Plot[]; unlockedPlotCount: number; now: number; selectedCrop: CropType; seeds: SeedInventory; handlePlotClick: (plot: Plot, clickedAt: number) => string | null }) {
   const [message, setMessage] = useState<string | null>(null);
   return (
     <section className="rounded-3xl bg-[#a7c77d] p-6 shadow-inner">
       <p className="mb-3 text-sm font-bold">Selected: {crops[selectedCrop].name} · Owned: {seeds[selectedCrop]}</p>
       {message && <p className="mb-3 rounded-lg bg-[#fff8dc] px-3 py-2 text-sm font-bold text-[#6b321c]">{message}</p>}
       <div className="grid grid-cols-3 gap-4">
-        {plots.map((plot) => {
+        {plots.slice(0, unlockedPlotCount).map((plot) => {
           const ready = isReady(plot, now);
           const remaining = getSecondsRemaining(plot, now);
           return (

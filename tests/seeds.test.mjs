@@ -64,3 +64,11 @@ test("Carrot and Corn become plantable after purchase", () => {
     assert.equal(planted.plots[0].crop, crop);
   }
 });
+
+test("locked plots cannot consume seeds or be planted", () => {
+  const plots = Array.from({ length: 10 }, (_, id) => ({ id, crop: null, plantedAt: null }));
+  const result = plantWithSeed(plots, INITIAL_SEEDS, 9, "potato", 1234, 9);
+  assert.equal(result.planted, false);
+  assert.strictEqual(result.plots, plots);
+  assert.strictEqual(result.seeds, INITIAL_SEEDS);
+});

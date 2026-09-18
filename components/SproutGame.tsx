@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGame } from "@/hooks/useGame";
 import { useSproutPersistence } from "@/hooks/useSproutPersistence";
-import { crops, mutations } from "@/lib/game-data";
 import SeedSelector from "@/components/SeedSelector";
 import Farm from "@/components/Farm";
 import CollectionBook from "@/components/CollectionBook";
 import FighterCard from "@/components/FighterCard";
 import Battle from "@/components/Battle";
 import PixelWorld from "@/components/PixelWorld";
+import type { WorldNotification } from "@/components/WorldNotifications";
 import { FIRST_WORLD } from "@/lib/world-data";
-import type { SproutSavePayloadV1, SproutSaveV1 } from "@/lib/save-types";
+import type { SproutSavePayloadV2, SproutSaveV2 } from "@/lib/save-types";
 import type { WorldPoint } from "@/lib/world-types";
 
 export default function SproutGame() {
@@ -22,8 +22,15 @@ export default function SproutGame() {
   return <SproutGameSession initialSave={hydration.save} scheduleSave={scheduleSave} />;
 }
 
-function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV1 | null; scheduleSave: (payload: SproutSavePayloadV1) => void }) {
-  const { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrops, awakenCrop, awardBattleVictory } = useGame(initialSave?.game);
+function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV2 | null; scheduleSave: (payload: SproutSavePayloadV2) => void }) {
+  const [notifications, setNotifications] = useState<WorldNotification[]>([]);
+  const notify = useCallback((notification: Omit<WorldNotification, "id">) => {
+    setNotifications((current) => [...current, { ...notification, id: crypto.randomUUID() }]);
+  }, []);
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((current) => current.filter((notification) => notification.id !== id));
+  }, []);
+  const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrops, awakenCrop, awardBattleVictory } = useGame(initialSave?.game, notify);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
@@ -32,10 +39,10 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
 
   useEffect(() => {
     scheduleSave({
-      game: { coins, seeds, selectedCrop, plots, harvestedCrops, collection, fighters },
+      game: { coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters },
       world: farmerWorld,
     });
-  }, [coins, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, farmerWorld, scheduleSave]);
+  }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, farmerWorld, scheduleSave]);
 
   return (
     <main className="h-dvh overflow-hidden bg-[#171c19] p-2 text-[#2f3e2f] sm:p-3">
@@ -57,28 +64,14 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
             <div className="rounded-lg bg-[#ffe28a] px-3 py-1.5 font-black tabular-nums text-[#4a2c12]">
               🪙 {coins}
             </div>
+            <div className="rounded-lg bg-[#d9ed92] px-3 py-1.5 text-xs font-black tabular-nums text-[#304719] sm:text-sm">
+              Farm Lv {farmLevel} · {farmXp} XP
+            </div>
           </div>
         </header>
 
-        {lastHarvest && (
-          <section className="mb-2 shrink-0 rounded-lg bg-[#fff8dc] px-3 py-1.5 shadow">
-            <div className="text-xs font-bold sm:text-sm">
-              {lastHarvest.newDiscovery &&
-                "✨ NEW DISCOVERY! "}
-              {mutations[lastHarvest.mutation].label}{" "}
-              {mutations[lastHarvest.mutation].name}{" "}
-              {crops[lastHarvest.crop].emoji}{" "}
-              {crops[lastHarvest.crop].name}
-            </div>
-
-            <div className="text-xs sm:text-sm">
-              Worth 🪙 {lastHarvest.value}
-            </div>
-          </section>
-        )}
-
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
         </div>
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (
@@ -92,7 +85,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
 
           <SeedSelector selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} />
 
-        <Farm plots={plots} now={now} selectedCrop={selectedCrop} seeds={seeds} handlePlotClick={handlePlotClick} />
+        <Farm plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} selectedCrop={selectedCrop} seeds={seeds} handlePlotClick={handlePlotClick} />
 
         <CollectionBook collection={collection} />
 

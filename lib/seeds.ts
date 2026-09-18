@@ -23,9 +23,10 @@ export function plantWithSeed(
   plotId: number,
   crop: CropType,
   plantedAt: number,
+  unlockedPlotCount = plots.length,
 ) {
   const plot = plots.find((entry) => entry.id === plotId);
-  if (!plot || plot.crop !== null || seeds[crop] < 1) {
+  if (!plot || plotId < 0 || plotId >= unlockedPlotCount || plot.crop !== null || seeds[crop] < 1) {
     return { planted: false, plots, seeds };
   }
   return {

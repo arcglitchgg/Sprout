@@ -86,9 +86,9 @@ test("all entrances and active plot centers are reachable without crossing block
   }
 });
 
-test("field coordinate helpers cover both 8x9 fields with only nine active plots", () => {
-  assert.equal(world.farmPlots.length, 9);
-  assert.equal(new Set(world.farmPlots.map((p) => p.id)).size, 9);
+test("field coordinate helpers cover both 8x9 fields with 144 progressive plots", () => {
+  assert.equal(world.farmPlots.length, 144);
+  assert.equal(new Set(world.farmPlots.map((p) => p.id)).size, 144);
   for (const field of WORLD_FIELDS) {
     for (let row = 0; row < 9; row++) for (let col = 0; col < 8; col++) {
       const bounds = fieldCell(field, col, row);

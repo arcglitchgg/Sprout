@@ -9,9 +9,9 @@ import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { Plot } from "@/lib/game-types";
 
-export default function WorldMap({ world, movement, moveTo, plots, now, onPlotClick, onBuildingClick, screenToWorld, debug = false }: {
+export default function WorldMap({ world, movement, moveTo, plots, unlockedPlotCount, now, onPlotClick, onBuildingClick, screenToWorld, debug = false }: {
   world: WorldDefinition; movement: WorldMovementState; moveTo: (point: WorldPoint) => void;
-  plots: Plot[]; now: number; onPlotClick: (id: number) => void;
+  plots: Plot[]; unlockedPlotCount: number; now: number; onPlotClick: (id: number) => void;
   onBuildingClick: (id: WorldBuildingId) => void; screenToWorld: (point: WorldPoint) => WorldPoint; debug?: boolean;
 }) {
   function handleClick(event: MouseEvent<HTMLDivElement>) {
@@ -26,11 +26,12 @@ export default function WorldMap({ world, movement, moveTo, plots, now, onPlotCl
     <img src={world.background} width={world.pixelWidth} height={world.pixelHeight} alt="Sprout Village" draggable={false} className="pointer-events-none absolute inset-0 max-w-none select-none" style={{ imageRendering: "pixelated" }} />
     {world.farmPlots.map((cell) => {
       const plot = plots.find((entry) => entry.id === cell.id);
+      const locked = cell.id >= unlockedPlotCount;
       const ready = plot ? isReady(plot, now) : false;
       const remaining = plot ? getSecondsRemaining(plot, now) : 0;
       const progress = plot?.crop && plot.plantedAt ? Math.max(0, (now - plot.plantedAt) / (crops[plot.crop].growTime * 1000)) : 0;
       const region = plot?.crop ? WORLD_CROP_SPRITES[plot.crop][ready ? "ready" : progress < 0.5 ? "early" : "growing"] : null;
-      return <button key={cell.id} type="button" onClick={(event) => { event.stopPropagation(); onPlotClick(cell.id); }} className="absolute z-10 flex items-center justify-center rounded-sm border border-[#ffe28a]/40 hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white" style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }} aria-label={`Plot ${cell.id + 1}: ${plot?.crop ? `${crops[plot.crop].name}, ${ready ? "ready" : `${remaining}s remaining`}` : "empty"}`}>
+      return <button key={cell.id} type="button" onClick={(event) => { event.stopPropagation(); onPlotClick(cell.id); }} className={`absolute z-10 flex items-center justify-center rounded-sm border focus-visible:ring-2 focus-visible:ring-white ${locked ? "border-black/10 bg-black/5 hover:bg-black/15" : "border-[#ffe28a]/40 hover:bg-white/20"}`} style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }} aria-disabled={locked} aria-label={`Plot ${cell.id + 1}: ${locked ? "locked" : plot?.crop ? `${crops[plot.crop].name}, ${ready ? "ready" : `${remaining}s remaining`}` : "empty"}`}>
         {region && <span className="pointer-events-none block" style={{ width: 32, height: 32, backgroundImage: `url("${sheet.src}")`, backgroundSize: "192px 192px", backgroundPosition: `${-region.x * 2}px ${-region.y * 2}px`, imageRendering: "pixelated" }} />}
         {ready && <span className="absolute -top-5 rounded bg-[#fff8dc] px-1 text-[10px] font-bold">READY</span>}
       </button>;

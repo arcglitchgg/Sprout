@@ -48,9 +48,29 @@ export const WALKABLE_REGIONS: CollisionRegion[] = [
   rectangle("dock deck", 1008, 704, 1186, 747),
   rectangle("dock end", 1023, 735, 1105, 798),
 ];
-// Columns 0–2, rows 6–8; row-major IDs 0–8. Interact at each plot's center.
-export const WORLD_FARM_PLOTS = Array.from({ length: 9 }, (_, id) => {
-  const bounds = fieldCell(WORLD_FIELDS[0], id % 3, 6 + Math.floor(id / 3));
+function fieldBlock(fieldIndex: number, columnStart: number, columnEnd: number, rowStart: number, rowEnd: number) {
+  const cells: Array<{ fieldIndex: number; column: number; row: number }> = [];
+  for (let row = rowStart; row <= rowEnd; row += 1) {
+    for (let column = columnStart; column <= columnEnd; column += 1) cells.push({ fieldIndex, column, row });
+  }
+  return cells;
+}
+
+const farmUnlockOrder = [
+  fieldBlock(0, 0, 2, 6, 8),
+  fieldBlock(0, 0, 2, 3, 5),
+  fieldBlock(0, 0, 2, 0, 2),
+  fieldBlock(0, 3, 5, 0, 2),
+  fieldBlock(0, 3, 5, 3, 8),
+  fieldBlock(0, 6, 7, 0, 8),
+  fieldBlock(1, 0, 1, 0, 8),
+  fieldBlock(1, 2, 3, 0, 8),
+  fieldBlock(1, 4, 5, 0, 8),
+  fieldBlock(1, 6, 7, 0, 8),
+].flat();
+
+export const WORLD_FARM_PLOTS = farmUnlockOrder.map(({ fieldIndex, column, row }, id) => {
+  const bounds = fieldCell(WORLD_FIELDS[fieldIndex], column, row);
   return { id, ...bounds, approach: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } };
 });
 const blocked = Array.from({ length: geometry.width * geometry.height }, (_, index) => {
