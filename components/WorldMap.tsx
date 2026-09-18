@@ -2,21 +2,20 @@
 import type { MouseEvent } from "react";
 import FarmerSprite from "@/components/FarmerSprite";
 import { WORLD_CROP_SPRITES, WORLD_SPRITE_SHEETS } from "@/lib/sprite-data";
-import { cellToWorld, displayedToWorld, worldToCell } from "@/lib/world-coordinates";
+import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
 import type { WorldBuildingId, WorldDefinition, WorldPoint } from "@/lib/world-types";
 import type { WorldMovementState } from "@/hooks/useWorldMovement";
 import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { Plot } from "@/lib/game-types";
 
-export default function WorldMap({ world, movement, moveTo, plots, now, onPlotClick, onBuildingClick, debug = false }: {
+export default function WorldMap({ world, movement, moveTo, plots, now, onPlotClick, onBuildingClick, screenToWorld, debug = false }: {
   world: WorldDefinition; movement: WorldMovementState; moveTo: (point: WorldPoint) => void;
   plots: Plot[]; now: number; onPlotClick: (id: number) => void;
-  onBuildingClick: (id: WorldBuildingId) => void; debug?: boolean;
+  onBuildingClick: (id: WorldBuildingId) => void; screenToWorld: (point: WorldPoint) => WorldPoint; debug?: boolean;
 }) {
   function handleClick(event: MouseEvent<HTMLDivElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const point = displayedToWorld(world, { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height }, { x: event.clientX, y: event.clientY });
+    const point = screenToWorld({ x: event.clientX, y: event.clientY });
     moveTo(worldToCell(world, point));
   }
   const player = cellToWorld(world, movement.position);

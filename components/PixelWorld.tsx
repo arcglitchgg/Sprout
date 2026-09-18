@@ -9,7 +9,9 @@ import WorldMarketOverlay from "@/components/WorldMarketOverlay";
 import { useWorldMovement } from "@/hooks/useWorldMovement";
 import { FIRST_WORLD } from "@/lib/world-data";
 import { findPath } from "@/lib/pathfinding";
-import { worldToCell } from "@/lib/world-coordinates";
+import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
+import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
+import type { CameraMode } from "@/lib/world-camera";
 import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
@@ -45,7 +47,8 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
   const handlePlotClickRef = useRef(handlePlotClick);
-  const [scale, setScale] = useState(1);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [cameraMode, setCameraMode] = useState<CameraMode>("follow");
   const [plantingPlotId, setPlantingPlotId] = useState<number | null>(null);
   const [growingPlotId, setGrowingPlotId] = useState<number | null>(null);
   const [worldMessage, setWorldMessage] = useState<string | null>(null);
@@ -76,11 +79,8 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
     const viewport = viewportRef.current;
     if (!viewport) return;
     const observer = new ResizeObserver(([entry]) => {
-      const nextScale = Math.min(
-        entry.contentRect.width / WORLD_PIXEL_WIDTH,
-        entry.contentRect.height / WORLD_PIXEL_HEIGHT,
-      );
-      if (Number.isFinite(nextScale) && nextScale > 0) setScale(nextScale);
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setViewportSize({ width, height });
     });
     observer.observe(viewport);
     return () => observer.disconnect();
@@ -164,6 +164,17 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
 
   const plantingPlot = plantingPlotId === null ? null : plots.find((plot) => plot.id === plantingPlotId);
   const growingPlot = growingPlotId === null ? null : plots.find((plot) => plot.id === growingPlotId);
+  const farmerWorldPosition = cellToWorld(FIRST_WORLD, state.position);
+  const camera = cameraMode === "follow"
+    ? getFollowCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, farmerWorldPosition)
+    : getOverviewCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize);
+
+  function screenToWorld(point: WorldPoint) {
+    const viewport = viewportRef.current;
+    if (!viewport) return point;
+    const bounds = viewport.getBoundingClientRect();
+    return screenToCanonicalWorld(camera, { x: bounds.left + viewport.clientLeft, y: bounds.top + viewport.clientTop }, point);
+  }
 
   return (
     <section className="relative flex h-full min-h-0 flex-col">
@@ -172,12 +183,17 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
           <h2 className="text-base font-bold sm:text-lg">Sprout Valley</h2>
           <p className="hidden text-xs text-[#b9c1b9] sm:block">Click or tap to walk. Visit the Seed Store, tend the highlighted plots, or enter the Dungeon.</p>
         </div>
+        <div className="flex rounded-lg border border-white/15 bg-[#252d27] p-0.5" aria-label="Camera mode">
+          {(["overview", "follow"] as CameraMode[]).map((mode) => (
+            <button key={mode} type="button" onClick={() => setCameraMode(mode)} aria-pressed={cameraMode === mode} className={`rounded-md px-2 py-1 text-xs font-bold capitalize ${cameraMode === mode ? "bg-[#ffe28a] text-[#4a2c12]" : "text-[#e8eadf] hover:bg-white/10"}`}>
+              {mode}
+            </button>
+          ))}
+        </div>
       </div>
-      <div ref={viewportRef} className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#101512] p-1 sm:p-2">
-        <div className="relative shrink-0" style={{ width: WORLD_PIXEL_WIDTH * scale, height: WORLD_PIXEL_HEIGHT * scale }}>
-          <div className="absolute left-0 top-0 origin-top-left" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `scale(${scale})`, imageRendering: "pixelated" }}>
-            <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} debug={debug} />
-          </div>
+      <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
+        <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
+          <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} screenToWorld={screenToWorld} debug={debug} />
         </div>
       </div>
 
