@@ -23,7 +23,7 @@ export default function SproutGame() {
 }
 
 function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV1 | null; scheduleSave: (payload: SproutSavePayloadV1) => void }) {
-  const { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrop, awakenCrop, awardBattleVictory } = useGame(initialSave?.game);
+  const { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrops, awakenCrop, awardBattleVictory } = useGame(initialSave?.game);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
@@ -78,7 +78,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
         )}
 
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrop={sellCrop} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+          <PixelWorld coins={coins} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
         </div>
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (

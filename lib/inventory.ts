@@ -34,6 +34,19 @@ export function sellHarvestedCrop(items: HarvestedCrop[], coins: number, itemId:
   };
 }
 
+export function sellHarvestedCrops(items: HarvestedCrop[], coins: number, itemIds: string[]) {
+  const selectedIds = new Set(itemIds);
+  const sold = items.filter((item) => selectedIds.has(item.id));
+  const total = sold.reduce((sum, item) => sum + item.sellValue, 0);
+
+  return {
+    sold,
+    remaining: sold.length ? items.filter((item) => !selectedIds.has(item.id)) : items,
+    total,
+    coins: coins + total,
+  };
+}
+
 export function harvestPlot(
   plots: Plot[],
   items: HarvestedCrop[],

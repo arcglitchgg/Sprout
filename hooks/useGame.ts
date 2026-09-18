@@ -6,7 +6,7 @@ import type { BattleState } from "@/lib/battle-types";
 import { crops } from "@/lib/game-data";
 import { isReady, rollMutation } from "@/lib/farming";
 import { generateFighter } from "@/lib/fighters";
-import { harvestPlot, removeHarvestedCrop, sellHarvestedCrop } from "@/lib/inventory";
+import { harvestPlot, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
 import type { CollectionEntry, CropType, Fighter, HarvestedCrop, MutationType, Plot, SeedInventory } from "@/lib/game-types";
 import type { SproutGameSaveV1 } from "@/lib/save-types";
@@ -140,6 +140,13 @@ export function useGame(initial?: SproutGameSaveV1) {
     setHarvestedCrops((current) => removeHarvestedCrop(current, itemId).remaining);
   }
 
+  function sellCrops(itemIds: string[]) {
+    const result = sellHarvestedCrops(harvestedCrops, coins, itemIds);
+    if (!result.sold.length) return;
+    setCoins((current) => current + result.total);
+    setHarvestedCrops(result.remaining);
+  }
+
   function awakenCrop(itemId: string) {
     const { item } = removeHarvestedCrop(harvestedCrops, itemId);
     if (!item) return;
@@ -148,5 +155,5 @@ export function useGame(initial?: SproutGameSaveV1) {
     setHarvestedCrops((current) => removeHarvestedCrop(current, itemId).remaining);
   }
 
-  return { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrop, awakenCrop, awardBattleVictory };
+  return { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrop, sellCrops, awakenCrop, awardBattleVictory };
 }

@@ -14,7 +14,8 @@ function load(name) {
   return loaded.exports;
 }
 
-const { createHarvestedCrop, harvestPlot, removeHarvestedCrop, sellHarvestedCrop } = load("@/lib/inventory");
+const { createHarvestedCrop, harvestPlot, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } = load("@/lib/inventory");
+const { selectAllMarketCrops, selectNormalMarketCrops, summarizeMarketSelection, toggleMarketSelection } = load("@/lib/market");
 const { generateFighter } = load("@/lib/fighters");
 
 test("harvesting consecutive ready plots clears each plot and preserves individual items", () => {
@@ -56,4 +57,43 @@ test("selling or awakening can remove exactly one selected item", () => {
   assert.equal(fighter.mutation, "golden");
   const awakened = removeHarvestedCrop(sold.remaining, "b");
   assert.deepEqual(awakened.remaining, []);
+});
+
+test("market selection toggles, selects all or Normal crops, and clears", () => {
+  const items = [
+    createHarvestedCrop("potato", "normal", 1, "a"),
+    createHarvestedCrop("carrot", "large", 2, "b"),
+    createHarvestedCrop("corn", "normal", 3, "c"),
+  ];
+  assert.deepEqual(toggleMarketSelection([], "a"), ["a"]);
+  assert.deepEqual(toggleMarketSelection(["a", "b"], "a"), ["b"]);
+  assert.deepEqual(selectAllMarketCrops(items), ["a", "b", "c"]);
+  assert.deepEqual(selectNormalMarketCrops(items), ["a", "c"]);
+  assert.deepEqual(selectAllMarketCrops([]), []);
+});
+
+test("batch sale totals selected items once and preserves unselected inventory", () => {
+  const items = [
+    createHarvestedCrop("potato", "normal", 1, "a"),
+    createHarvestedCrop("carrot", "large", 2, "b"),
+    createHarvestedCrop("corn", "golden", 3, "c"),
+  ];
+  const result = sellHarvestedCrops(items, 100, ["a", "c", "c", "missing"]);
+  assert.deepEqual(result.sold.map((item) => item.id), ["a", "c"]);
+  assert.deepEqual(result.remaining.map((item) => item.id), ["b"]);
+  assert.equal(result.total, 100);
+  assert.equal(result.coins, 200);
+});
+
+test("market summary reports value and requires confirmation only for rare crops", () => {
+  const items = [
+    createHarvestedCrop("potato", "normal", 1, "a"),
+    createHarvestedCrop("carrot", "large", 2, "b"),
+    createHarvestedCrop("corn", "golden", 3, "c"),
+    createHarvestedCrop("potato", "prismatic", 4, "d"),
+  ];
+  assert.deepEqual(summarizeMarketSelection(items, ["a", "b"]), { count: 2, total: 37, requiresConfirmation: false });
+  assert.equal(summarizeMarketSelection(items, ["c"]).requiresConfirmation, true);
+  assert.equal(summarizeMarketSelection(items, ["d"]).requiresConfirmation, true);
+  assert.deepEqual(summarizeMarketSelection(items, []), { count: 0, total: 0, requiresConfirmation: false });
 });

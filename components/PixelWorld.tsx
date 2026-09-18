@@ -32,7 +32,7 @@ type Props = {
   fighters: Fighter[];
   collection: CollectionEntry[];
   harvestedCrops: HarvestedCrop[];
-  sellCrop: (itemId: string) => void;
+  sellCrops: (itemIds: string[]) => void;
   awakenCrop: (itemId: string) => void;
   awardBattleVictory: (result: BattleState) => void;
   initialFarmerTile?: WorldPoint;
@@ -40,7 +40,7 @@ type Props = {
   onFarmerSettled: (tile: WorldPoint, facing: "left" | "right") => void;
 };
 
-export default function PixelWorld({ coins, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrop, awakenCrop, awardBattleVictory, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
+export default function PixelWorld({ coins, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, awardBattleVictory, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: initialFarmerTile, initialFacing: initialFarmerFacing, onSettled: onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
@@ -214,7 +214,7 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
       {seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
       {dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
       {farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} onClose={() => setFarmhouseOpen(false)} />}
-      {marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrop={sellCrop} onClose={() => setMarketOpen(false)} />}
+      {marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
     </section>
   );
 }
