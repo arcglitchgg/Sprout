@@ -12,9 +12,11 @@
     "test:seeds": "node --test tests/seeds.test.mjs",
     "test:battle": "node --test tests/battle.test.mjs",
     "test:pathfinding": "node --test tests/pathfinding.test.mjs",
-    "test:persistence": "node --test tests/persistence.test.mjs"
+    "test:persistence": "node --test tests/persistence.test.mjs",
+    "test:discord": "node --test tests/discord.test.mjs"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"
