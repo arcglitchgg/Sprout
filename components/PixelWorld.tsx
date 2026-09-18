@@ -166,14 +166,14 @@ export default function PixelWorld({ coins, plots, now, selectedCrop, setSelecte
   const growingPlot = growingPlotId === null ? null : plots.find((plot) => plot.id === growingPlotId);
 
   return (
-    <section className="relative mb-10">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1 text-[#e8eadf]">
+    <section className="relative flex h-full min-h-0 flex-col">
+      <div className="mb-2 flex shrink-0 flex-wrap items-end justify-between gap-2 px-1 text-[#e8eadf]">
         <div>
-          <h2 className="text-xl font-bold">Sprout Valley</h2>
-          <p className="text-sm text-[#b9c1b9]">Click or tap to walk. Visit the Seed Store, tend the highlighted plots, or enter the Dungeon.</p>
+          <h2 className="text-base font-bold sm:text-lg">Sprout Valley</h2>
+          <p className="hidden text-xs text-[#b9c1b9] sm:block">Click or tap to walk. Visit the Seed Store, tend the highlighted plots, or enter the Dungeon.</p>
         </div>
       </div>
-      <div ref={viewportRef} className="flex h-[calc(100dvh-11rem)] min-h-72 max-h-[864px] w-full items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#101512] p-2">
+      <div ref={viewportRef} className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#101512] p-1 sm:p-2">
         <div className="relative shrink-0" style={{ width: WORLD_PIXEL_WIDTH * scale, height: WORLD_PIXEL_HEIGHT * scale }}>
           <div className="absolute left-0 top-0 origin-top-left" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `scale(${scale})`, imageRendering: "pixelated" }}>
             <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} debug={debug} />

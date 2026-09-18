@@ -25,6 +25,7 @@ export default function SproutGame() {
 function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV1 | null; scheduleSave: (payload: SproutSavePayloadV1) => void }) {
   const { coins, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, lastHarvest, harvestedCrops, fighters, handlePlotClick, sellCrop, awakenCrop, awardBattleVictory } = useGame(initialSave?.game);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
+  const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
     setFarmerWorld({ farmerTile, facing });
   }, []);
@@ -37,24 +38,31 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
   }, [coins, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, farmerWorld, scheduleSave]);
 
   return (
-    <main className="min-h-screen bg-[#171c19] p-3 text-[#2f3e2f] sm:p-6">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-6 flex items-center justify-between rounded-2xl bg-[#252d27] p-4 text-[#f4e8c1] shadow">
+    <main className="h-dvh overflow-hidden bg-[#171c19] p-2 text-[#2f3e2f] sm:p-3">
+      <div className="mx-auto flex h-full max-w-6xl flex-col">
+        <header className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-[#252d27] px-3 py-2 text-[#f4e8c1] shadow sm:px-4">
           <div>
-            <h1 className="text-3xl font-bold">Sprout 🌱</h1>
-            <p className="text-sm">
+            <h1 className="text-xl font-bold sm:text-2xl">Sprout 🌱</h1>
+            <p className="hidden text-xs sm:block">
               Grow. Collect. Mutate. Fight.
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#ffe28a] px-4 py-2 font-black tabular-nums text-[#4a2c12]">
-            🪙 {coins}
+          <div className="flex items-center gap-2">
+            {process.env.NODE_ENV === "development" && (
+              <button type="button" onClick={() => setShowLegacyPanels(true)} className="rounded-lg border border-white/20 px-2 py-1 text-xs font-bold text-[#f4e8c1] hover:bg-white/10">
+                Debug panels
+              </button>
+            )}
+            <div className="rounded-lg bg-[#ffe28a] px-3 py-1.5 font-black tabular-nums text-[#4a2c12]">
+              🪙 {coins}
+            </div>
           </div>
         </header>
 
         {lastHarvest && (
-          <section className="mb-6 rounded-2xl bg-[#fff8dc] p-4 shadow">
-            <div className="text-sm font-bold">
+          <section className="mb-2 shrink-0 rounded-lg bg-[#fff8dc] px-3 py-1.5 shadow">
+            <div className="text-xs font-bold sm:text-sm">
               {lastHarvest.newDiscovery &&
                 "✨ NEW DISCOVERY! "}
               {mutations[lastHarvest.mutation].label}{" "}
@@ -63,19 +71,23 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
               {crops[lastHarvest.crop].name}
             </div>
 
-            <div className="mt-1 text-sm">
+            <div className="text-xs sm:text-sm">
               Worth 🪙 {lastHarvest.value}
             </div>
           </section>
         )}
 
-        <PixelWorld coins={coins} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrop={sellCrop} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+        <div className="min-h-0 flex-1">
+          <PixelWorld coins={coins} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrop={sellCrop} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+        </div>
 
+        {process.env.NODE_ENV === "development" && showLegacyPanels && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#171c19]/95 p-3 sm:p-6">
         <div className="mx-auto max-w-4xl">
           <div className="mb-3 flex items-center gap-3 text-[#d6dbd2]">
             <span className="h-px flex-1 bg-white/15" />
             <span className="text-xs font-bold uppercase tracking-[0.18em]">Legacy game panels</span>
-            <span className="h-px flex-1 bg-white/15" />
+            <button type="button" onClick={() => setShowLegacyPanels(false)} className="rounded-lg bg-[#f4e8c1] px-3 py-1 text-sm font-bold text-[#2f3e2f]">Close</button>
           </div>
 
           <SeedSelector selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} />
@@ -110,6 +122,8 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
         </section>
           <Battle fighters={fighters} onVictory={awardBattleVictory} />
         </div>
+        </div>
+        )}
       </div>
     </main>
   );
