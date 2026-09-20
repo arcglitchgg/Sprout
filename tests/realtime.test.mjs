@@ -94,6 +94,10 @@ test("diagnostics classify failures without including raw authentication materia
   assert.ok(!JSON.stringify(shape).includes("should-not-appear"));
   assert.equal(diagnostics.inspectRealtimeChannelError({ message: "Bearer secret", status: 403 }).fields.message, "[redacted sensitive value]");
   assert.equal(diagnostics.inspectRealtimeChannelError(undefined), null);
+  assert.equal(diagnostics.safeRealtimeHostname("wss://example.supabase.co/realtime/v1/websocket?apikey=secret"), "example.supabase.co");
+  assert.equal(diagnostics.safeRealtimeHostname("invalid"), "invalid endpoint");
+  assert.equal(diagnostics.safeRealtimeCloseReason("Bearer secret"), "[redacted sensitive value]");
+  assert.equal(diagnostics.safeRealtimeCloseReason("normal closure"), "normal closure");
 });
 
 test("farm room lifecycle tracks only identity, leaves on switch/return, and marks owner online/offline", async () => {

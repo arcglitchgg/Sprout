@@ -1,9 +1,10 @@
 // Temporary opt-in browser diagnostics. Never include tokens, keys, or payloads.
 export type RealtimeDebugStage = "idle" | "token-request" | "token-received" | "auth-set" | "channel-connecting" | "subscribed" | "presence-track-ok" | "presence-synced" | "channel-error" | "timeout";
 export type RealtimeErrorShape = { type: string; constructor: string; keys: string[]; fields: Partial<Record<"message" | "reason" | "code" | "status" | "error" | "type", string>>; cause?: RealtimeErrorShape };
-export type RealtimeDebugSnapshot = { stage: RealtimeDebugStage; error: string | null; recent: RealtimeDebugStage[]; channelError: RealtimeErrorShape | null };
+export type RealtimeTransportSnapshot = { hostname: string; webSocketAvailable: boolean; event: "connecting" | "open" | "close" | "error"; state: string; closeCode: number | null; closeReason: string | null };
+export type RealtimeDebugSnapshot = { stage: RealtimeDebugStage; error: string | null; recent: RealtimeDebugStage[]; channelError: RealtimeErrorShape | null; transport: RealtimeTransportSnapshot | null };
 
-let snapshot: RealtimeDebugSnapshot = { stage: "idle", error: null, recent: ["idle"], channelError: null };
+let snapshot: RealtimeDebugSnapshot = { stage: "idle", error: null, recent: ["idle"], channelError: null, transport: null };
 const listeners = new Set<() => void>();
 
 export function subscribeRealtimeDiagnostics(listener: () => void) {
@@ -31,8 +32,22 @@ export function realtimeStage(stage: string, detail?: string | number, channelEr
   else if (stage === "token-or-channel-rejected") { next = "channel-error"; error = "Token or room access was rejected."; }
   else if (stage === "channel-error") { next = "channel-error"; error = typeof detail === "string" ? detail : "Realtime channel failed."; }
   if (!next) return;
-  snapshot = { stage: next, error, recent: [...snapshot.recent, next].slice(-8), channelError: next === "channel-error" ? channelError ?? null : null };
+  snapshot = { ...snapshot, stage: next, error, recent: [...snapshot.recent, next].slice(-8), channelError: next === "channel-error" ? channelError ?? null : null };
   listeners.forEach((listener) => listener());
+}
+
+export function realtimeTransportEvent(update: Partial<RealtimeTransportSnapshot>) {
+  if (process.env.NEXT_PUBLIC_REALTIME_DEBUG !== "1") return;
+  snapshot = { ...snapshot, transport: { hostname: "unknown", webSocketAvailable: false, event: "connecting", state: "unknown", closeCode: null, closeReason: null, ...snapshot.transport, ...update } };
+  listeners.forEach((listener) => listener());
+}
+
+export function safeRealtimeHostname(endpoint: string): string {
+  try { return new URL(endpoint).hostname; } catch { return "invalid endpoint"; }
+}
+
+export function safeRealtimeCloseReason(reason: unknown): string | null {
+  return safeDiagnosticValue(reason);
 }
 
 export function realtimeErrorKind(error: unknown) {

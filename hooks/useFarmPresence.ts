@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createRealtimeClient, RealtimeTokenError, requestRealtimeToken } from "@/lib/realtime-client";
-import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, safeRealtimeChannelError } from "@/lib/realtime-diagnostics";
+import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, realtimeTransportEvent, safeRealtimeChannelError, safeRealtimeCloseReason, safeRealtimeHostname } from "@/lib/realtime-diagnostics";
 
 export function farmRoom(ownerId: string) {
   if (!/^\d{5,25}$/.test(ownerId)) throw new Error("Invalid farm owner.");
@@ -43,6 +43,26 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         await client.realtime.setAuth(credentials.token);
         if (closed) return;
         realtimeStage("auth-set");
+        if (process.env.NEXT_PUBLIC_REALTIME_DEBUG === "1") {
+          const realtime = client.realtime;
+          realtimeTransportEvent({
+            hostname: typeof realtime.endpointURL === "function" ? safeRealtimeHostname(realtime.endpointURL()) : "unknown",
+            webSocketAvailable: typeof window.WebSocket === "function",
+            event: "connecting",
+            state: typeof realtime.connectionState === "function" ? realtime.connectionState() : "unknown",
+            closeCode: null,
+            closeReason: null,
+          });
+          // Read-only socket observers. Do not inspect URLs, frames, or logger data.
+          const observer = realtime as typeof realtime & { socketAdapter?: {
+            onOpen: (callback: () => void) => void;
+            onClose: (callback: (event: CloseEvent) => void) => void;
+            onError: (callback: () => void) => void;
+          } };
+          observer.socketAdapter?.onOpen(() => { if (!closed) realtimeTransportEvent({ event: "open", state: realtime.connectionState() }); });
+          observer.socketAdapter?.onClose((event) => { if (!closed) realtimeTransportEvent({ event: "close", state: realtime.connectionState(), closeCode: event.code, closeReason: safeRealtimeCloseReason(event.reason) }); });
+          observer.socketAdapter?.onError(() => { if (!closed) realtimeTransportEvent({ event: "error", state: realtime.connectionState() }); });
+        }
         const channel = client.channel(farmRoom(ownerId!), { config: { private: true, presence: { key: userId! } } });
         channel.on("presence", { event: "sync" }, () => {
           if (!closed) {

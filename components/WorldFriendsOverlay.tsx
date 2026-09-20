@@ -143,6 +143,7 @@ function RealtimeDebugPanel({ ownerId, role, memberCount }: { ownerId: string | 
     <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Realtime Debug — <strong>{diagnostics.stage}</strong></span><span>Room: {safeRoom}</span><span>Role: {role}</span><span>Members seen: {memberCount}</span></div>
     <p className="mt-1 break-words text-[#d7e4cb]">Recent: {diagnostics.recent.join(" → ")}</p>
     {diagnostics.error && <p className="mt-1 break-words text-[#ffd4b0]">Status: {diagnostics.error}</p>}
+    {diagnostics.transport && <div className="mt-1 break-words text-[#d7e4cb]"><p>Realtime host: {diagnostics.transport.hostname}</p><p>Browser WebSocket: {diagnostics.transport.webSocketAvailable ? "available" : "unavailable"}</p><p>Socket: {diagnostics.transport.event} · {diagnostics.transport.state}</p>{diagnostics.transport.closeCode !== null && <p>Close code: {diagnostics.transport.closeCode}</p>}{diagnostics.transport.closeReason && <p>Close reason: {diagnostics.transport.closeReason}</p>}</div>}
     {diagnostics.channelError && <div className="mt-1 break-words text-[#ffd4b0]"><RealtimeErrorDetails shape={diagnostics.channelError} /></div>}
   </aside>;
 }
