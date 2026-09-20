@@ -40,6 +40,7 @@ type Props = {
   harvestedCrops: HarvestedCrop[];
   sellCrops: (itemIds: string[]) => void;
   awakenCrop: (itemId: string) => void;
+  fuseFighters: (selectedIds: string[]) => Fighter | null;
   awardBattleVictory: (result: BattleState) => void;
   notifications: WorldNotification[];
   notify: (notification: Omit<WorldNotification, "id">) => void;
@@ -49,7 +50,7 @@ type Props = {
   onFarmerSettled: (tile: WorldPoint, facing: "left" | "right") => void;
 };
 
-export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
+export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: initialFarmerTile, initialFacing: initialFarmerFacing, onSettled: onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
@@ -237,7 +238,7 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
 
       {seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
       {dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
-      {farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} onClose={() => setFarmhouseOpen(false)} />}
+      {farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
       {marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
     </section>
   );

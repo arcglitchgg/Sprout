@@ -6,6 +6,7 @@ import type { BattleState } from "@/lib/battle-types";
 import { crops } from "@/lib/game-data";
 import { isReady, rollMutation } from "@/lib/farming";
 import { generateFighter } from "@/lib/fighters";
+import { fuseFighters as createFusion } from "@/lib/fusion";
 import { harvestPlot, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { claimBattleVictoryReward, FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
@@ -31,6 +32,7 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   const plotsRef = useRef(plots);
   const seedsRef = useRef(seeds);
   const harvestedCropsRef = useRef(harvestedCrops);
+  const fightersRef = useRef(fighters);
 
   const farmLevel = getFarmLevel(farmXp);
   const unlockedPlotCount = getUnlockedPlotCount(farmXp);
@@ -144,10 +146,19 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
     if (!result.item) return;
     const fighter = generateFighter(result.item);
     harvestedCropsRef.current = result.remaining;
-    setFighters((current) => [...current, fighter]);
+    fightersRef.current = [...fightersRef.current, fighter];
+    setFighters(fightersRef.current);
     setHarvestedCrops(result.remaining);
     awardFarmXp(FARM_XP_REWARDS.awaken);
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrop, sellCrops, awakenCrop, awardBattleVictory };
+  function fuseFighters(selectedIds: string[]) {
+    const fusion = createFusion(fightersRef.current, selectedIds);
+    if (!fusion) return null;
+    fightersRef.current = fusion.remaining;
+    setFighters(fusion.remaining);
+    return fusion.result;
+  }
+
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrop, sellCrops, awakenCrop, fuseFighters, awardBattleVictory };
 }

@@ -30,7 +30,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
   const dismissNotification = useCallback((id: string) => {
     setNotifications((current) => current.filter((notification) => notification.id !== id));
   }, []);
-  const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrops, awakenCrop, awardBattleVictory } = useGame(initialSave?.game, notify);
+  const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrops, awakenCrop, fuseFighters, awardBattleVictory } = useGame(initialSave?.game, notify);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
@@ -71,7 +71,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
         </header>
 
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} awardBattleVictory={awardBattleVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} fighters={fighters} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} awardBattleVictory={awardBattleVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
         </div>
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (

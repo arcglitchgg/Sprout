@@ -1,14 +1,14 @@
 import { personalities } from "@/lib/game-data";
 import type { CropType, Fighter, MutationType, PersonalityType } from "@/lib/game-types";
 
-export function generateFighter(source: { crop: CropType; mutation: MutationType }): Fighter {
+export function generateFighter(source: { crop: CropType; mutation: MutationType }, random: () => number = Math.random): Fighter {
   const personalityKeys = Object.keys(
     personalities
   ) as PersonalityType[];
 
   const personality =
     personalityKeys[
-    Math.floor(Math.random() * personalityKeys.length)
+    Math.floor(random() * personalityKeys.length)
     ];
 
   let hp = 100;
