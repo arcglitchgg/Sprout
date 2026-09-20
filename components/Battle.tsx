@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBattle } from "@/hooks/useBattle";
 import { VICTORY_COINS } from "@/lib/battle-data";
+import { isRewardableDungeonVictory } from "@/lib/battle";
 import BattleArena from "@/components/BattleArena";
 import type { BattlePresentationProgress } from "@/components/BattleArena";
 import type { BattleState } from "@/lib/battle-types";
@@ -33,7 +34,7 @@ export default function Battle({ fighters, onVictory, onComplete }: { fighters: 
 
   useEffect(() => {
     if (!battle || battle.status === "running" || !presentation.complete) return;
-    if (battle.status === "victory") onVictory(battle);
+    if (isRewardableDungeonVictory(battle)) onVictory(battle);
     onComplete?.(battle);
   }, [battle, onVictory, onComplete, presentation.complete]);
 

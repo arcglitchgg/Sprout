@@ -11,15 +11,24 @@ export function actionInterval(speed: number) {
 
 export { calculateDamage } from "@/lib/skill-selection";
 
-export function createBattle(team: Fighter[], id: string, seed = 0): BattleState {
+export function createBattle(team: Fighter[], id: string, seed = 0, enemyTeam: Fighter[] = TRAINING_TEAM, mode: "dungeon" | "friendly-pvp" = "dungeon"): BattleState {
   if (team.length !== 3 || new Set(team.map((fighter) => fighter.id)).size !== 3) {
     throw new Error("Select exactly three distinct fighters.");
   }
+  if (enemyTeam.length !== 3 || new Set([...team, ...enemyTeam].map((fighter) => fighter.id)).size !== 6) throw new Error("Battle teams need six distinct fighters.");
   const copyTeam = (fighters: Fighter[], side: BattleSide): Combatant[] => fighters.map((fighter, slot) => ({
     ...fighter, side, slot, currentHp: fighter.hp, nextActionAt: actionInterval(fighter.speed),
     actions: 0, guardReady: fighter.personality === "protective",
   }));
-  return { id, seed: seed >>> 0, rngState: seed >>> 0, decisions: [], status: "running", elapsed: 0, combatants: [...copyTeam(team, "player"), ...copyTeam(TRAINING_TEAM, "enemy")], log: [{ at: 0, message: "Training Garden battle started." }] };
+  return { id, mode, seed: seed >>> 0, rngState: seed >>> 0, decisions: [], status: "running", elapsed: 0, combatants: [...copyTeam(team, "player"), ...copyTeam(enemyTeam, "enemy")], log: [{ at: 0, message: mode === "friendly-pvp" ? "Friendly PvP battle started." : "Training Garden battle started." }] };
+}
+
+export function createFriendlyBattle(challenger: Fighter[], opponent: Fighter[], id: string, seed: number) {
+  return createBattle(challenger, id, seed, opponent, "friendly-pvp");
+}
+
+export function isRewardableDungeonVictory(battle: BattleState) {
+  return battle.mode === "dungeon" && battle.status === "victory";
 }
 
 function label(fighter: Combatant) {

@@ -139,7 +139,7 @@ test("visiting uses snapshot plots, blocks every farm mutation, and never persis
       return { state: { tile: FIRST_WORLD.start, position: FIRST_WORLD.start, facing: "right", moving: false, frame: 0 }, moveTo: (_tile, onArrival) => { if (deferArrival) arrival = onArrival; else onArrival?.(); }, cancelInteraction: () => {} };
     } },
   };
-  for (const component of ["WorldMap", "WorldSeedShopPanel", "WorldDungeonOverlay", "WorldFarmhouseOverlay", "WorldMarketOverlay", "WorldFriendsOverlay", "WorldNotifications", "RemotePlayersLayer"]) uiMocks[`@/components/${component}`] = { default: component };
+  for (const component of ["WorldMap", "WorldSeedShopPanel", "WorldDungeonOverlay", "WorldFarmhouseOverlay", "WorldMarketOverlay", "WorldFriendsOverlay", "WorldNotifications", "RemotePlayersLayer", "WorldPvpOverlay"]) uiMocks[`@/components/${component}`] = { default: component };
   const uiLoad = loader(uiMocks);
   const PixelWorld = uiLoad("@/components/PixelWorld").default;
   const own = save();

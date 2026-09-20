@@ -251,6 +251,7 @@ test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and ro
   const updates = [];
   const callbacks = new Map();
   const sent = [];
+  const matches = new Map();
   const intervals = [];
   let status;
   let roomState = { a: [{ userId: "11111", isOwner: true }], b: [{ userId: "22222", isOwner: false }], c: [{ userId: "33333", isOwner: false }] };
@@ -262,6 +263,15 @@ test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and ro
   };
   const hook = loader({
     react: { useState: (value) => [value, (next) => updates.push(next)], useEffect: (effect) => effects.push(effect), useMemo: (factory) => factory(), useRef: (value) => ({ current: value }), useCallback: (callback) => callback },
+    "@/lib/social-client": { socialRequest: async (_session, path, method = "GET", body) => {
+      if (path === "/api/pvp/matches" && method === "POST") { matches.set(body.challengeId, { id: body.challengeId, challengerId: "11111", opponentId: body.opponentId, status: "pending_acceptance" }); return { ok: true }; }
+      const id = path.split("/").at(-1);
+      const match = matches.get(id) ?? { id, challengerId: "22222", opponentId: "11111", status: "pending_acceptance" };
+      if (method === "POST") match.status = "waiting_for_teams";
+      if (method === "DELETE") match.status = "cancelled";
+      matches.set(id, match);
+      return method === "GET" ? match : { ok: true };
+    } },
     "@/lib/realtime-client": { requestRealtimeToken: async () => ({ token: "signed" }), createRealtimeClient: () => ({ realtime: { setAuth: async () => {} }, channel: () => channel, removeChannel: async () => {} }) },
   })("@/hooks/useFarmPresence");
   const env = { ...process.env };
@@ -288,7 +298,8 @@ test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and ro
     assert.ok(updates.includes("Challenge declined"));
     assert.equal(await runtime.requestChallenge("22222"), true);
     const third = sent.filter((entry) => entry.event === "challenge-request").at(-1).payload;
-    callbacks.get("broadcast:challenge-accept")({ payload: third });
+    matches.get(third.challengeId).status = "waiting_for_teams";
+    await callbacks.get("broadcast:challenge-accept")({ payload: third });
     assert.ok(updates.includes("Challenge accepted — Battle coming next"));
     runtime.dismissChallenge();
     assert.equal(await runtime.requestChallenge("22222"), true);
@@ -308,18 +319,19 @@ test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and ro
     callbacks.get("presence:sync")();
     const incomingAt = Date.now();
     const incoming = { challengeId: "incoming-123", fromUserId: "22222", toUserId: "11111", createdAt: incomingAt, expiresAt: incomingAt + 15000 };
-    callbacks.get("broadcast:challenge-request")({ payload: incoming });
+    await callbacks.get("broadcast:challenge-request")({ payload: incoming });
     const extra = { ...incoming, challengeId: "incoming-456" };
-    callbacks.get("broadcast:challenge-request")({ payload: extra });
+    await callbacks.get("broadcast:challenge-request")({ payload: extra });
     assert.equal(sent.at(-1).event, "challenge-busy");
     await runtime.respondChallenge(true);
     assert.equal(sent.at(-1).event, "challenge-accept");
     runtime.dismissChallenge();
-    callbacks.get("broadcast:challenge-request")({ payload: extra });
+    await callbacks.get("broadcast:challenge-request")({ payload: extra });
     await runtime.respondChallenge(false);
     assert.equal(sent.at(-1).event, "challenge-decline");
-    callbacks.get("broadcast:challenge-request")({ payload: incoming });
-    callbacks.get("broadcast:challenge-cancel")({ payload: incoming });
+    const cancelled = { ...incoming, challengeId: "incoming-789" };
+    await callbacks.get("broadcast:challenge-request")({ payload: cancelled });
+    await callbacks.get("broadcast:challenge-cancel")({ payload: cancelled });
     assert.ok(updates.includes("Challenge cancelled"));
     cleanup();
     assert.equal(runtime.remoteStore.getSnapshot().length, 0);

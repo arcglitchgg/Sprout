@@ -27,7 +27,7 @@ const position = (fighter: PlacedFighter) => ({
   y: fighter.slot === 0 ? 49 : fighter.slot === 1 ? 24 : 75,
 });
 
-export default function BattleArena({ battle, team, onProgress }: { battle: BattleState | null; team: (Fighter | undefined)[]; onProgress: (progress: BattlePresentationProgress) => void }) {
+export default function BattleArena({ battle, team, onProgress, sideLabels = ["Your garden", "Training rivals"] }: { battle: BattleState | null; team: (Fighter | undefined)[]; onProgress: (progress: BattlePresentationProgress) => void; sideLabels?: [string, string] }) {
   const latest = useRef(battle);
   const cursor = useRef(0);
   const visibleLogCount = useRef(battle ? 1 : 0);
@@ -155,7 +155,7 @@ export default function BattleArena({ battle, team, onProgress }: { battle: Batt
   } as CSSProperties);
 
   return <div className="battle-arena relative h-[440px] overflow-hidden rounded-2xl border-4 border-[#637a45] bg-[#b7cc8b] text-[#2f3e2f]" aria-label="3 versus 3 battlefield">
-    <div className="absolute inset-x-4 top-3 flex justify-between text-sm font-bold"><span>Your garden</span><span>Training rivals</span></div>
+    <div className="absolute inset-x-4 top-3 flex justify-between text-sm font-bold"><span>{sideLabels[0]}</span><span>{sideLabels[1]}</span></div>
     <div className="absolute inset-y-14 left-1/2 border-l-2 border-dashed border-[#637a45]/30" />
     {fighters.map((fighter) => <div key={fighter.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${position(fighter).x}%`, top: `${position(fighter).y}%` }}>
       <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot}

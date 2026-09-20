@@ -2,6 +2,7 @@ import type { Fighter } from "@/lib/game-types";
 import type { ActionDecision, ActionId } from "@/lib/skill-types";
 
 export type BattleStatus = "running" | "victory" | "defeat" | "draw";
+export type BattleMode = "dungeon" | "friendly-pvp";
 export type BattleSide = "player" | "enemy";
 
 export type Combatant = Fighter & {
@@ -18,6 +19,7 @@ export type BattleEvent = { at: number; message: string };
 
 export type BattleState = {
   id: string;
+  mode: BattleMode;
   status: BattleStatus;
   elapsed: number;
   combatants: Combatant[];

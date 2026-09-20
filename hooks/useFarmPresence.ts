@@ -5,6 +5,8 @@ import { createRealtimeClient, RealtimeTokenError, requestRealtimeToken } from "
 import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, realtimeTransportEvent, safeRealtimeChannelError, safeRealtimeCloseReason, safeRealtimeHostname } from "@/lib/realtime-diagnostics";
 import { shouldSendMovement, createRemoteMovementStore, type RemoteMovementPacket } from "@/lib/remote-movement";
 import { CHALLENGE_MS, validChallengePacket, type ChallengeEvent, type ChallengePacket, type ChallengeState } from "@/lib/challenges";
+import { socialRequest } from "@/lib/social-client";
+import type { LivePvpMatch } from "@/lib/pvp-types";
 
 export function farmRoom(ownerId: string) {
   if (!/^\d{5,25}$/.test(ownerId)) throw new Error("Invalid farm owner.");
@@ -34,26 +36,41 @@ export function useFarmPresence(session: string | null, userId: string | null, o
     if (!userId || targetId === userId || challengeRef.current || !membersRef.current.has(targetId) || !challengeSend.current) return false;
     const createdAt = Date.now();
     const packet = { challengeId: crypto.randomUUID(), fromUserId: userId, toUserId: targetId, createdAt, expiresAt: createdAt + CHALLENGE_MS };
+    try { await socialRequest(session!, "/api/pvp/matches", "POST", { challengeId: packet.challengeId, opponentId: targetId, farmOwnerId: ownerId }); }
+    catch { setChallengeMessage("Challenge could not be created."); return false; }
+    if (challengeRef.current || !membersRef.current.has(targetId)) { void socialRequest(session!, `/api/pvp/matches/${packet.challengeId}`, "DELETE").catch(() => {}); return false; }
     changeChallenge({ role: "outgoing", status: "pending", packet });
     setChallengeMessage(null);
-    if (await challengeSend.current("challenge-request", packet)) return true;
+    if (await challengeSend.current?.("challenge-request", packet)) return true;
+    void socialRequest(session!, `/api/pvp/matches/${packet.challengeId}`, "DELETE").catch(() => {});
     const pending = challengeRef.current as ChallengeState | null;
     if (pending?.packet.challengeId === packet.challengeId) changeChallenge(null);
     setChallengeMessage("Challenge could not be sent.");
     return false;
-  }, [userId, changeChallenge]);
+  }, [session, userId, ownerId, changeChallenge]);
   const respondChallenge = useCallback(async (accept: boolean) => {
     const active = challengeRef.current;
     if (!active || active.role !== "incoming" || active.status !== "pending" || !challengeSend.current) return;
-    if (!await challengeSend.current(accept ? "challenge-accept" : "challenge-decline", active.packet)) { setChallengeMessage("Could not send your response."); return; }
+    try {
+      if (accept) await socialRequest(session!, `/api/pvp/matches/${active.packet.challengeId}`, "POST");
+      else await socialRequest(session!, `/api/pvp/matches/${active.packet.challengeId}`, "DELETE");
+    } catch { setChallengeMessage("Could not confirm the challenge."); return; }
+    if (challengeRef.current?.packet.challengeId !== active.packet.challengeId) {
+      if (accept) void socialRequest(session!, `/api/pvp/matches/${active.packet.challengeId}`, "DELETE").catch(() => {});
+      return;
+    }
+    await challengeSend.current?.(accept ? "challenge-accept" : "challenge-decline", active.packet);
     changeChallenge(accept ? { ...active, status: "accepted" } : null);
     setChallengeMessage(accept ? "Challenge accepted — Battle coming next" : null);
-  }, [changeChallenge]);
+  }, [session, changeChallenge]);
   const dismissChallenge = useCallback(() => {
     const active = challengeRef.current;
-    if (active?.role === "outgoing" && active.status === "pending") void challengeSend.current?.("challenge-cancel", active.packet);
+    if (active?.role === "outgoing" && active.status === "pending") {
+      void challengeSend.current?.("challenge-cancel", active.packet);
+      if (session) void socialRequest(session, `/api/pvp/matches/${active.packet.challengeId}`, "DELETE").catch(() => {});
+    }
     changeChallenge(null); setChallengeMessage(null);
-  }, [changeChallenge]);
+  }, [session, changeChallenge]);
   const remoteStore = useMemo(() => createRemoteMovementStore(), []);
   const latestLocal = useRef<Omit<RemoteMovementPacket, "userId" | "seq" | "timestamp"> | null>(null);
   const sendRef = useRef<((movement: NonNullable<typeof latestLocal.current>, force: boolean) => void) | null>(null);
@@ -113,6 +130,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         let lastSentAt = 0;
         let sequence = 0;
         let members = new Set<string>();
+        let incomingPending = false;
         challengeSend.current = async (event, packet) => {
           if (!subscribed || closed) return false;
           try { return await channel.send({ type: "broadcast", event, payload: packet }) === "ok"; }
@@ -131,12 +149,18 @@ export function useFarmPresence(session: string | null, userId: string | null, o
           if (!closed) remoteStore.apply(payload, members, userId!, Date.now());
         });
         for (const event of ["challenge-request", "challenge-accept", "challenge-decline", "challenge-cancel", "challenge-busy"] as ChallengeEvent[]) {
-          channel.on("broadcast", { event }, ({ payload }) => {
+          channel.on("broadcast", { event }, async ({ payload }) => {
             if (closed || !validChallengePacket(payload, members, Date.now())) return;
             const packet = payload as ChallengePacket;
             if (event === "challenge-request") {
               if (packet.toUserId !== userId) return;
-              if (challengeRef.current) { void challengeSend.current?.("challenge-busy", packet); return; }
+              if (challengeRef.current || incomingPending) { void challengeSend.current?.("challenge-busy", packet); return; }
+              incomingPending = true;
+              try {
+                const match = await socialRequest<LivePvpMatch>(session!, `/api/pvp/matches/${packet.challengeId}`);
+                if (closed || match.status !== "pending_acceptance" || match.challengerId !== packet.fromUserId || match.opponentId !== userId || challengeRef.current) return;
+              } catch { return; }
+              finally { incomingPending = false; }
               changeChallenge({ role: "incoming", status: "pending", packet });
               setChallengeMessage(null);
               return;
@@ -144,7 +168,13 @@ export function useFarmPresence(session: string | null, userId: string | null, o
             const active = challengeRef.current;
             if (!active || active.packet.challengeId !== packet.challengeId || active.packet.fromUserId !== packet.fromUserId || active.packet.toUserId !== packet.toUserId) return;
             if (active.role === "outgoing" && packet.fromUserId === userId) {
-              if (event === "challenge-accept") { changeChallenge({ ...active, status: "accepted" }); setChallengeMessage("Challenge accepted — Battle coming next"); }
+              if (event === "challenge-accept") {
+                try {
+                  const match = await socialRequest<LivePvpMatch>(session!, `/api/pvp/matches/${packet.challengeId}`);
+                  if (closed || challengeRef.current?.packet.challengeId !== packet.challengeId || match.status !== "waiting_for_teams" || match.challengerId !== userId || match.opponentId !== packet.toUserId) return;
+                  changeChallenge({ ...active, status: "accepted" }); setChallengeMessage("Challenge accepted — Battle coming next");
+                } catch { /* Polling can recover an accepted match. */ }
+              }
               if (event === "challenge-decline" || event === "challenge-busy") { changeChallenge(null); setChallengeMessage(event === "challenge-busy" ? "Player is busy" : "Challenge declined"); }
             } else if (active.role === "incoming" && event === "challenge-cancel") { changeChallenge(null); setChallengeMessage("Challenge cancelled"); }
           });
@@ -159,7 +189,10 @@ export function useFarmPresence(session: string | null, userId: string | null, o
             membersRef.current = members;
             remoteStore.retain(members);
             const active = challengeRef.current;
-            if (active && !members.has(active.role === "outgoing" ? active.packet.toUserId : active.packet.fromUserId)) { changeChallenge(null); setChallengeMessage("Player left the farm."); }
+            if (active?.status === "pending" && !members.has(active.role === "outgoing" ? active.packet.toUserId : active.packet.fromUserId)) {
+              void socialRequest(session!, `/api/pvp/matches/${active.packet.challengeId}`, "DELETE").catch(() => {});
+              changeChallenge(null); setChallengeMessage("Player left the farm.");
+            }
             setPresentIds(ids);
             if (joined && latestLocal.current) sendRef.current?.(latestLocal.current, true);
             realtimeStage("presence-synced", ids.length);
@@ -207,7 +240,16 @@ export function useFarmPresence(session: string | null, userId: string | null, o
       const active = challengeRef.current;
       if (active?.status === "pending" && Date.now() >= active.packet.expiresAt) { changeChallenge(null); setChallengeMessage(active.role === "outgoing" ? "Challenge expired" : null); }
     }, 250);
-    return () => { closed = true; controller.abort(); window.clearInterval(refresh); window.clearInterval(timeout); sendRef.current = null; challengeSend.current = null; membersRef.current = new Set(); remoteStore.clear(); cleanup?.(); };
+    const poll = window.setInterval(() => {
+      const active = challengeRef.current;
+      if (active?.role !== "outgoing" || active.status !== "pending") return;
+      void socialRequest<LivePvpMatch>(session!, `/api/pvp/matches/${active.packet.challengeId}`).then((match) => {
+        if (closed || challengeRef.current?.packet.challengeId !== match.id) return;
+        if (match.status === "waiting_for_teams" || match.status === "ready") { changeChallenge({ ...active, status: "accepted" }); setChallengeMessage("Challenge accepted — Battle coming next"); }
+        if (match.status === "cancelled" || match.status === "expired") { changeChallenge(null); setChallengeMessage(match.status === "expired" ? "Challenge expired" : "Challenge declined"); }
+      }).catch(() => {});
+    }, 1000);
+    return () => { closed = true; controller.abort(); window.clearInterval(refresh); window.clearInterval(timeout); window.clearInterval(poll); sendRef.current = null; challengeSend.current = null; membersRef.current = new Set(); remoteStore.clear(); cleanup?.(); };
   }, [session, userId, ownerId, remoteStore, changeChallenge]);
   const active = !!(session && userId && ownerId);
   return { ownerOnline: active && ownerOnline, presentIds: active ? presentIds : [], remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge };
