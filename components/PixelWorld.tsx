@@ -6,11 +6,15 @@ import WorldSeedShopPanel from "@/components/WorldSeedShopPanel";
 import WorldDungeonOverlay from "@/components/WorldDungeonOverlay";
 import WorldFarmhouseOverlay from "@/components/WorldFarmhouseOverlay";
 import WorldMarketOverlay from "@/components/WorldMarketOverlay";
+import WorldFriendsOverlay from "@/components/WorldFriendsOverlay";
 import WorldNotifications from "@/components/WorldNotifications";
 import type { WorldNotification } from "@/components/WorldNotifications";
 import { useWorldMovement } from "@/hooks/useWorldMovement";
-import { FIRST_WORLD } from "@/lib/world-data";
-import { findPath } from "@/lib/pathfinding";
+import { useDiscord } from "@/hooks/useDiscord";
+import { FARM_OWNER_TILE, FIRST_WORLD } from "@/lib/world-data";
+import { findPath, findPathToAdjacent } from "@/lib/pathfinding";
+import { canModifyFarm } from "@/lib/social";
+import type { FriendFarmSnapshot, WorldContext, WorldPlayer } from "@/lib/social-types";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
 import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
@@ -50,19 +54,36 @@ type Props = {
   onFarmerSettled: (tile: WorldPoint, facing: "left" | "right") => void;
 };
 
-export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled }: Props) {
-  const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: initialFarmerTile, initialFacing: initialFarmerFacing, onSettled: onFarmerSettled });
+export default function PixelWorld(props: Props) {
+  const [context, setContext] = useState<WorldContext>({ mode: "own-farm" });
+  const [cameraMode, setCameraMode] = useState<CameraMode>("follow");
+  // Only the presentation scene remounts. SproutGame/useGame and its own position remain intact.
+  return <PixelWorldScene key={context.mode === "visiting" ? `visit:${context.ownerId}` : "own"} {...props} context={context} cameraMode={cameraMode} setCameraMode={setCameraMode}
+    onVisit={(snapshot) => setContext({ mode: "visiting", ownerId: snapshot.owner.userId, snapshot })}
+    onReturnHome={() => setContext({ mode: "own-farm" })} />;
+}
+
+function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, fighters, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
+  context: WorldContext; onVisit: (snapshot: FriendFarmSnapshot) => void; onReturnHome: () => void; cameraMode: CameraMode; setCameraMode: (mode: CameraMode) => void;
+}) {
+  const visiting = !canModifyFarm(context);
+  const plots = context.mode === "visiting" ? context.snapshot.plots : ownPlots;
+  const unlockedPlotCount = context.mode === "visiting" ? context.snapshot.unlockedPlotCount : ownUnlockedPlotCount;
+  const { user } = useDiscord();
+  const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: visiting ? FIRST_WORLD.start : initialFarmerTile, initialFacing: visiting ? "right" : initialFarmerFacing, onSettled: visiting ? undefined : onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
   const handlePlotClickRef = useRef(handlePlotClick);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [cameraMode, setCameraMode] = useState<CameraMode>("follow");
   const [plantingPlotId, setPlantingPlotId] = useState<number | null>(null);
   const [growingPlotId, setGrowingPlotId] = useState<number | null>(null);
   const [seedShopOpen, setSeedShopOpen] = useState(false);
   const [dungeonOpen, setDungeonOpen] = useState(false);
   const [farmhouseOpen, setFarmhouseOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [ownerPrompt, setOwnerPrompt] = useState<string | null>(null);
+  const modalOpen = farmhouseOpen || marketOpen || friendsOpen || dungeonOpen || seedShopOpen || ownerPrompt !== null;
   const [debug, setDebug] = useState(false);
 
   useEffect(() => {
@@ -100,11 +121,18 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
     setSeedShopOpen(false);
     setFarmhouseOpen(false);
     setMarketOpen(false);
+    setFriendsOpen(false);
+    setOwnerPrompt(null);
   }
 
   function arriveAtPlot(plotId: number) {
     const plot = plotsRef.current.find((entry) => entry.id === plotId);
     if (!plot) return;
+    if (visiting) {
+      if (plot.crop) setGrowingPlotId(plotId);
+      else notify({ kind: "info", title: "This is your friend's farm. Plots are view-only." });
+      return;
+    }
     const arrivedAt = Date.now();
     if (!plot.crop) {
       setPlantingPlotId(plotId);
@@ -118,7 +146,7 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
   }
 
   function selectPlot(plotId: number) {
-    if (farmhouseOpen || marketOpen) return;
+    if (modalOpen) return;
     closeInteraction();
     const worldPlot = FIRST_WORLD.farmPlots.find((plot) => plot.id === plotId);
     if (!worldPlot) return;
@@ -136,16 +164,16 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
   }
 
   function moveInWorld(destination: { x: number; y: number }) {
-    if (farmhouseOpen || marketOpen) return;
+    if (modalOpen) return;
     closeInteraction();
     moveTo(destination);
   }
 
   function selectBuilding(buildingId: WorldBuildingId) {
-    if (farmhouseOpen || marketOpen) return;
+    if (modalOpen) return;
     closeInteraction();
     const building = FIRST_WORLD.buildings.find((entry) => entry.id === buildingId);
-    if (!building || (buildingId !== "seed-shop" && buildingId !== "dungeon" && buildingId !== "farmhouse" && buildingId !== "market")) return;
+    if (!building || (visiting && buildingId !== "world-exit") || (buildingId !== "seed-shop" && buildingId !== "dungeon" && buildingId !== "farmhouse" && buildingId !== "market" && buildingId !== "world-exit")) return;
     const entrance = worldToCell(FIRST_WORLD, building.entrance);
     const path = findPath(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, entrance);
     if (!path.length) {
@@ -157,11 +185,12 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
       if (buildingId === "dungeon") setDungeonOpen(true);
       if (buildingId === "farmhouse") setFarmhouseOpen(true);
       if (buildingId === "market") setMarketOpen(true);
+      if (buildingId === "world-exit") setFriendsOpen(true);
     });
   }
 
   function plantSelectedCrop() {
-    if (plantingPlotId === null) return;
+    if (visiting || plantingPlotId === null) return;
     const plot = plotsRef.current.find((entry) => entry.id === plantingPlotId);
     if (!plot) return;
     const message = handlePlotClickRef.current(plot, Date.now());
@@ -175,6 +204,23 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
   const plantingPlot = plantingPlotId === null ? null : plots.find((plot) => plot.id === plantingPlotId);
   const growingPlot = growingPlotId === null ? null : plots.find((plot) => plot.id === growingPlotId);
   const farmerWorldPosition = cellToWorld(FIRST_WORLD, state.position);
+  const ownerPosition = cellToWorld(FIRST_WORLD, FARM_OWNER_TILE);
+  const players: WorldPlayer[] = [{
+    userId: user?.id ?? "local", displayName: user?.globalName ?? user?.username ?? "Farmer", ...farmerWorldPosition,
+    facing: state.facing, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame,
+  }];
+  if (context.mode === "visiting") players.push({
+    userId: context.ownerId, displayName: context.snapshot.owner.displayName ?? context.snapshot.owner.username,
+    ...ownerPosition, facing: "left", isOwner: true, isLocal: false, online: false,
+  });
+
+  function selectPlayer(player: WorldPlayer) {
+    if (modalOpen || !visiting || !player.isOwner || player.isLocal) return;
+    closeInteraction();
+    const route = findPathToAdjacent(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, worldToCell(FIRST_WORLD, player));
+    if (!route) { notify({ kind: "error", title: "The farm owner cannot be reached." }); return; }
+    moveTo(route.destination, () => setOwnerPrompt(player.displayName));
+  }
   const camera = cameraMode === "follow"
     ? getFollowCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, farmerWorldPosition)
     : getOverviewCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize);
@@ -190,9 +236,10 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
     <section className="relative flex h-full min-h-0 flex-col">
       <div className="mb-2 flex shrink-0 flex-wrap items-end justify-between gap-2 px-1 text-[#e8eadf]">
         <div>
-          <h2 className="text-base font-bold sm:text-lg">Sprout Valley</h2>
-          <p className="hidden text-xs text-[#b9c1b9] sm:block">Click or tap to walk. Visit the Seed Store, tend the highlighted plots, or enter the Dungeon.</p>
+          <h2 className="max-w-64 truncate text-base font-bold sm:text-lg">{context.mode === "visiting" ? `${context.snapshot.owner.displayName ?? context.snapshot.owner.username}'s farm · Lv ${context.snapshot.owner.farmLevel}` : "Sprout Valley"}</h2>
+          <p className="hidden text-xs text-[#b9c1b9] sm:block">{visiting ? "Visiting · View-only. Walk around or talk to the farm owner." : "Click or tap to walk. Visit the shops, plots, Dungeon, or Friends exit."}</p>
         </div>
+        {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-3 py-2 text-xs font-bold text-[#4a2c12]">Return Home</button>}
         <div className="flex rounded-lg border border-white/15 bg-[#252d27] p-0.5" aria-label="Camera mode">
           {(["overview", "follow"] as CameraMode[]).map((mode) => (
             <button key={mode} type="button" onClick={() => setCameraMode(mode)} aria-pressed={cameraMode === mode} className={`rounded-md px-2 py-1 text-xs font-bold capitalize ${cameraMode === mode ? "bg-[#ffe28a] text-[#4a2c12]" : "text-[#e8eadf] hover:bg-white/10"}`}>
@@ -203,12 +250,12 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
       </div>
       <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
-          <WorldMap world={FIRST_WORLD} movement={state} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} screenToWorld={screenToWorld} debug={debug} />
+          <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
       </div>
 
-      {plantingPlot && !plantingPlot.crop && (
+      {!visiting && plantingPlot && !plantingPlot.crop && (
         <div className="absolute bottom-5 left-1/2 z-50 w-[min(92%,420px)] -translate-x-1/2 rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-[#2f3e2f] shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <strong>Plant Plot {plantingPlot.id + 1}</strong>
@@ -231,15 +278,17 @@ export default function PixelWorld({ coins, unlockedPlotCount, plots, now, selec
 
       {growingPlot?.crop && (
         <div className="absolute bottom-5 left-1/2 z-50 flex w-[min(92%,360px)] -translate-x-1/2 items-center justify-between rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-sm text-[#2f3e2f] shadow-xl">
-          <span><strong>{crops[growingPlot.crop].name}</strong> · {isReady(growingPlot, now) ? "Ready — click the plot again" : `${getSecondsRemaining(growingPlot, now)}s remaining`}</span>
+          <span><strong>{crops[growingPlot.crop].name}</strong> · {isReady(growingPlot, now) ? visiting ? "Ready · View-only" : "Ready — click the plot again" : `${getSecondsRemaining(growingPlot, now)}s remaining`}</span>
           <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close crop status">×</button>
         </div>
       )}
 
-      {seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
-      {dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
-      {farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
-      {marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
+      {!visiting && seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
+      {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
+      {!visiting && farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
+      {!visiting && marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
+      {friendsOpen && <WorldFriendsOverlay fighters={fighters} onVisit={onVisit} onClose={() => setFriendsOpen(false)} />}
+      {ownerPrompt !== null && <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Challenge farm owner"><div className="w-full max-w-sm rounded-xl bg-[#fff8dc] p-5 text-[#2f3e2f]"><h3 className="break-words text-lg font-bold">Challenge {ownerPrompt}?</h3><p className="my-3 text-sm">Farm battles are coming next.</p><div className="flex gap-2"><button type="button" disabled className="rounded-lg bg-[#4f772d] px-3 py-2 text-white opacity-40">Battle · Coming next</button><button type="button" onClick={() => setOwnerPrompt(null)} className="rounded-lg border border-[#765438] px-3 py-2 font-bold">Cancel</button></div></div></div>}
     </section>
   );
 }

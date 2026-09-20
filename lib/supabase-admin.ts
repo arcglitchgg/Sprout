@@ -8,7 +8,7 @@ function config() {
   return { url: url.replace(/\/$/, ""), key };
 }
 
-async function supabaseRequest(path: string, init: RequestInit = {}) {
+export async function supabaseRequest(path: string, init: RequestInit = {}) {
   const { url, key } = config();
   return fetch(`${url}/rest/v1/${path}`, {
     ...init,

@@ -16,7 +16,8 @@
     "test:discord": "node --test tests/discord.test.mjs",
     "test:camera": "node --test tests/camera.test.mjs",
     "test:progression": "node --test tests/progression.test.mjs",
-    "test:fusion": "node --test tests/fusion.test.mjs"
+    "test:fusion": "node --test tests/fusion.test.mjs",
+    "test:social": "node --test --test-isolation=none tests/social.test.mjs"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
@@ -25,6 +26,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

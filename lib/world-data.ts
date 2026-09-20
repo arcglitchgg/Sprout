@@ -83,3 +83,6 @@ export const FIRST_WORLD: WorldDefinition = {
   ...geometry, background: "/assets/official-farm-map/sprout-village.png",
   start: worldToCell(geometry, { x: 725, y: 590 }), buildings, farmPlots: WORLD_FARM_PLOTS, blocked,
 };
+
+// Shared idle host anchor, snapped to a navigation cell on the Farmhouse apron.
+export const FARM_OWNER_TILE = worldToCell(geometry, { x: 760, y: 535 });
