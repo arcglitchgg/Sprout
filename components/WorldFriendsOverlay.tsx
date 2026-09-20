@@ -4,18 +4,19 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useDiscord } from "@/hooks/useDiscord";
 import { socialRequest } from "@/lib/social-client";
 import FighterCard from "@/components/FighterCard";
+import NeighborhoodRanks from "@/components/NeighborhoodRanks";
 import type { Fighter } from "@/lib/game-types";
 import type { DefenseTeam, FriendAction, FriendFarmSnapshot, FriendLists, SproutProfile } from "@/lib/social-types";
 import { getRealtimeDiagnostics, subscribeRealtimeDiagnostics, type RealtimeErrorShape } from "@/lib/realtime-diagnostics";
 
 const button = "rounded-lg bg-[#4f772d] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40";
-type Tab = "friends" | "requests" | "search" | "defense";
+type Tab = "friends" | "requests" | "search" | "defense" | "rankings";
 
 export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presenceOwnerId, presenceRole, presenceMemberCount }: {
   fighters: Fighter[]; onVisit: (snapshot: FriendFarmSnapshot) => void; onClose: () => void;
   presenceOwnerId: string | null; presenceRole: "owner" | "visitor"; presenceMemberCount: number;
 }) {
-  const { session } = useDiscord();
+  const { session, user } = useDiscord();
   const [tab, setTab] = useState<Tab>("friends");
   const [lists, setLists] = useState<FriendLists>({ friends: [], incoming: [], outgoing: [] });
   const [results, setResults] = useState<SproutProfile[]>([]);
@@ -94,7 +95,7 @@ export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presen
       {process.env.NEXT_PUBLIC_REALTIME_DEBUG === "1" && <RealtimeDebugPanel ownerId={presenceOwnerId} role={presenceRole} memberCount={presenceMemberCount} />}
       {!session ? <p className="p-5 text-sm">Open Sprout in Discord with a connected cloud session to use Neighborhood. Your local farm remains available.</p> : <>
         <nav className="flex shrink-0 gap-1 overflow-x-auto p-2" aria-label="Neighborhood sections">
-          {(["friends", "requests", "search", "defense"] as Tab[]).map((value) => <button key={value} type="button" disabled={busy} onClick={() => { if (value !== tab && value === "defense") { setDefense(null); setSelectedIds([]); } setTab(value); setError(null); setMessage(null); }} aria-pressed={tab === value} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold ${tab === value ? "bg-[#fff8dc]" : "bg-[#d8b875]/50"}`}>{value === "defense" ? "Defense Team" : value === "requests" ? `Requests (${lists.incoming.length})` : value === "search" ? "Player Search" : "Friends"}</button>)}
+          {(["friends", "requests", "search", "defense", "rankings"] as Tab[]).map((value) => <button key={value} type="button" disabled={busy} onClick={() => { if (value !== tab && value === "defense") { setDefense(null); setSelectedIds([]); } setTab(value); setError(null); setMessage(null); }} aria-pressed={tab === value} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold ${tab === value ? "bg-[#fff8dc]" : "bg-[#d8b875]/50"}`}>{value === "defense" ? "Defense Team" : value === "requests" ? `Requests (${lists.incoming.length})` : value === "search" ? "Player Search" : value === "rankings" ? "Leaderboards" : "Friends"}</button>)}
         </nav>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
           {error && <p role="alert" className="rounded-lg bg-red-100 p-2 text-sm text-red-900">{error}</p>}
@@ -105,6 +106,7 @@ export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presen
             {lists.friends.length === 0 && <p className="p-3 text-sm">No friends yet. Find a Sprout player in Player Search.</p>}
             {lists.friends.map((profile) => profileRow(profile, <><button className={button} type="button" disabled={busy} onClick={() => visit(profile)}>Visit Farm</button><button className="px-2 text-xs underline" type="button" disabled={busy} onClick={() => friendAction(profile, "remove")}>Remove</button></>))}
           </>}
+          {tab === "rankings" && <NeighborhoodRanks session={session} localId={user?.id ?? null} />}
           {tab === "requests" && <>
             <h3 className="font-bold">Incoming requests</h3>
             {!lists.incoming.length && <p className="text-sm">No incoming requests.</p>}

@@ -3,6 +3,8 @@ import { readCloudSave, supabaseRequest } from "@/lib/supabase-admin";
 import { validateSproutSave } from "@/lib/save-storage";
 import { SocialError } from "@/lib/social-server";
 import type { LivePvpMatch } from "@/lib/pvp-types";
+import { resolvePvpMatch } from "@/lib/pvp-resolution";
+import { publicProfile } from "@/lib/social";
 
 const userId = (value: unknown): value is string => typeof value === "string" && /^\d{5,25}$/.test(value);
 const matchId = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
@@ -56,4 +58,32 @@ export async function getPvpMatch(actor: string, id: string): Promise<LivePvpMat
   const match = await rpc("get_sprout_pvp", { p_id: id, p_actor: actor });
   if (!match) throw new SocialError(404, "Match not found.");
   return match as LivePvpMatch;
+}
+
+export async function completePvpMatch(actor: string, id: string) {
+  const match = await getPvpMatch(actor, id);
+  if (match.status !== "ready" && match.status !== "active" && match.status !== "completed") throw new SocialError(409, "Match cannot be completed.");
+  const resolved = match.status === "completed" ? { result: null, winnerId: null } : resolvePvpMatch(match);
+  const result = await rpc("finalize_sprout_pvp", { p_id: id, p_actor: actor, p_result: resolved.result, p_winner: resolved.winnerId });
+  if (result?.error) throw new SocialError(409, "Match cannot be completed.");
+  if (!result || !["challenger", "opponent", "draw"].includes(String(result.result)) || !Number.isInteger(result.pvpWins)) throw new SocialError(503, "Invalid completion response.");
+  return result;
+}
+
+export async function getPvpHistory(actor: string) {
+  const response = await supabaseRequest("rpc/get_sprout_pvp_history", { method: "POST", body: JSON.stringify({ p_actor: actor }) });
+  if (!response.ok) throw new SocialError(503, "Battle history is unavailable.");
+  const rows: unknown = await response.json();
+  if (!Array.isArray(rows)) throw new SocialError(503, "Invalid history response.");
+  return { matches: rows.map((row) => {
+    if (!row || typeof row !== "object" || !("opponent" in row) || !row.opponent || typeof row.opponent !== "object") throw new SocialError(503, "Invalid history response.");
+    return { id: String(row.id), opponent: publicProfile(row.opponent as Record<string, unknown>), result: row.result, completedAt: row.completedAt };
+  }) };
+}
+
+export async function getLeaderboard(actor: string, category: string | null, scope: string | null) {
+  if (!category || !["money", "combat-power", "pvp-wins"].includes(category) || !scope || !["global", "friends"].includes(scope)) throw new SocialError(400, "Invalid leaderboard selection.");
+  const response = await rpc("get_sprout_leaderboard", { p_actor: actor, p_category: category, p_scope: scope });
+  if (!response || response.error || !Array.isArray(response.entries)) throw new SocialError(503, "Leaderboard is unavailable.");
+  return { entries: response.entries.map((row: Record<string, unknown>) => ({ rank: Number(row.rank), player: publicProfile(row.player as Record<string, unknown>), value: Number(row.value) })), currentPlayer: response.currentPlayer };
 }

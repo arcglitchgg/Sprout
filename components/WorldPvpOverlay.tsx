@@ -20,7 +20,7 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
   const [error, setError] = useState<string | null>(null);
   const [opponentLeft, setOpponentLeft] = useState(false);
   const seenOpponent = useRef(false);
-  const ready = match?.status === "ready" || match?.status === "active";
+  const ready = match?.status === "ready" || match?.status === "active" || match?.status === "completed";
   const ended = opponentLeft || match?.status === "cancelled" || match?.status === "expired";
   const valid = validPvpTeamSelection(selected, fighters);
 
@@ -61,7 +61,7 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
 
   return <div className="fixed inset-0 z-[80] overflow-y-auto bg-[#0b0f0c]/95 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Friendly PvP">
     {ready && match?.challengerTeam && match.opponentTeam && match.battleId && match.battleSeed !== null
-      ? <FriendlyBattle match={match} localId={localId} opponentName={opponentName} onReturn={onClose} />
+      ? <FriendlyBattle match={match} session={session} localId={localId} opponentName={opponentName} onReturn={onClose} />
       : <div className="mx-auto max-w-xl rounded-xl bg-[#f4e8c1] p-4 text-[#2f3e2f]">
         <h2 className="text-xl font-black">Friendly PvP vs {opponentName}</h2>
         <p className="text-sm">Choose three fighters. Both players must ready before battle starts.</p>
