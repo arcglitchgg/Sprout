@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useEffect, useMemo, useState } from "react";
-import { DiscordSDK } from "@discord/embedded-app-sdk";
+import { DiscordSDK, patchUrlMappings } from "@discord/embedded-app-sdk";
 import { authenticateDiscordActivity, isDiscordActivity } from "@/lib/discord-client";
 import type { BasicDiscordUser, DiscordEnvironment } from "@/lib/discord-client";
 
@@ -16,6 +16,7 @@ export type DiscordRuntimeState = {
 
 const standaloneState: DiscordRuntimeState = { environment: "standalone", ready: false, user: null, error: null, session: null, resolved: false };
 export const DiscordContext = createContext<DiscordRuntimeState>(standaloneState);
+let supabaseMappingPatched = false;
 
 async function exchangeAuthorizationCode(code: string) {
   const response = await fetch("/api/discord/token", {
@@ -48,6 +49,10 @@ export default function DiscordProvider({ children }: { children: React.ReactNod
         return;
       }
       try {
+        if (!supabaseMappingPatched) {
+          patchUrlMappings([{ prefix: "/supabase", target: "uchattvjtpzzyoluekcp.supabase.co" }], { patchWebSocket: true });
+          supabaseMappingPatched = true;
+        }
         const sdk = new DiscordSDK(clientId);
         let session: string | null = null;
         const user = await authenticateDiscordActivity({
