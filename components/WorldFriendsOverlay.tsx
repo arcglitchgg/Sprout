@@ -6,7 +6,7 @@ import { socialRequest } from "@/lib/social-client";
 import FighterCard from "@/components/FighterCard";
 import type { Fighter } from "@/lib/game-types";
 import type { DefenseTeam, FriendAction, FriendFarmSnapshot, FriendLists, SproutProfile } from "@/lib/social-types";
-import { getRealtimeDiagnostics, subscribeRealtimeDiagnostics } from "@/lib/realtime-diagnostics";
+import { getRealtimeDiagnostics, subscribeRealtimeDiagnostics, type RealtimeErrorShape } from "@/lib/realtime-diagnostics";
 
 const button = "rounded-lg bg-[#4f772d] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40";
 type Tab = "friends" | "requests" | "search" | "defense";
@@ -143,5 +143,16 @@ function RealtimeDebugPanel({ ownerId, role, memberCount }: { ownerId: string | 
     <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Realtime Debug — <strong>{diagnostics.stage}</strong></span><span>Room: {safeRoom}</span><span>Role: {role}</span><span>Members seen: {memberCount}</span></div>
     <p className="mt-1 break-words text-[#d7e4cb]">Recent: {diagnostics.recent.join(" → ")}</p>
     {diagnostics.error && <p className="mt-1 break-words text-[#ffd4b0]">Status: {diagnostics.error}</p>}
+    {diagnostics.channelError && <div className="mt-1 break-words text-[#ffd4b0]"><RealtimeErrorDetails shape={diagnostics.channelError} /></div>}
   </aside>;
+}
+
+function RealtimeErrorDetails({ shape }: { shape: RealtimeErrorShape }) {
+  return <>
+    <p>Channel error type: {shape.type}</p>
+    <p>Constructor: {shape.constructor}</p>
+    <p>Keys: {shape.keys.length ? shape.keys.join(", ") : "none"}</p>
+    {Object.entries(shape.fields).map(([key, value]) => <p key={key}>{key}: {value}</p>)}
+    {shape.cause && <div className="mt-1 border-l border-[#ffd4b0]/50 pl-2"><p>Cause:</p><RealtimeErrorDetails shape={shape.cause} /></div>}
+  </>;
 }

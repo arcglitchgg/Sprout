@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createRealtimeClient, RealtimeTokenError, requestRealtimeToken } from "@/lib/realtime-client";
-import { realtimeErrorKind, realtimeStage, safeRealtimeChannelError } from "@/lib/realtime-diagnostics";
+import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, safeRealtimeChannelError } from "@/lib/realtime-diagnostics";
 
 export function farmRoom(ownerId: string) {
   if (!/^\d{5,25}$/.test(ownerId)) throw new Error("Invalid farm owner.");
@@ -64,7 +64,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
               if (!closed) realtimeStage(result === "ok" ? "presence-track-ok" : "presence-track-failed", result);
             }).catch((reason: unknown) => { if (!closed) realtimeStage("presence-track-failed", realtimeErrorKind(reason)); });
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            if (status === "CHANNEL_ERROR") realtimeStage("channel-error", safeRealtimeChannelError(error));
+            if (status === "CHANNEL_ERROR") realtimeStage("channel-error", safeRealtimeChannelError(error), inspectRealtimeChannelError(error) ?? undefined);
             else realtimeStage(status === "TIMED_OUT" ? "socket-or-network-failed" : "channel-closed");
             setOwnerOnline(false); setPresentIds([]);
           }

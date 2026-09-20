@@ -1,8 +1,9 @@
 // Temporary opt-in browser diagnostics. Never include tokens, keys, or payloads.
 export type RealtimeDebugStage = "idle" | "token-request" | "token-received" | "auth-set" | "channel-connecting" | "subscribed" | "presence-track-ok" | "presence-synced" | "channel-error" | "timeout";
-export type RealtimeDebugSnapshot = { stage: RealtimeDebugStage; error: string | null; recent: RealtimeDebugStage[] };
+export type RealtimeErrorShape = { type: string; constructor: string; keys: string[]; fields: Partial<Record<"message" | "reason" | "code" | "status" | "error" | "type", string>>; cause?: RealtimeErrorShape };
+export type RealtimeDebugSnapshot = { stage: RealtimeDebugStage; error: string | null; recent: RealtimeDebugStage[]; channelError: RealtimeErrorShape | null };
 
-let snapshot: RealtimeDebugSnapshot = { stage: "idle", error: null, recent: ["idle"] };
+let snapshot: RealtimeDebugSnapshot = { stage: "idle", error: null, recent: ["idle"], channelError: null };
 const listeners = new Set<() => void>();
 
 export function subscribeRealtimeDiagnostics(listener: () => void) {
@@ -12,7 +13,7 @@ export function subscribeRealtimeDiagnostics(listener: () => void) {
 
 export function getRealtimeDiagnostics() { return snapshot; }
 
-export function realtimeStage(stage: string, detail?: string | number) {
+export function realtimeStage(stage: string, detail?: string | number, channelError?: RealtimeErrorShape) {
   if (process.env.NEXT_PUBLIC_REALTIME_DEBUG !== "1") return;
   if (detail === undefined) console.info(`[Sprout Presence] ${stage}`);
   else console.info(`[Sprout Presence] ${stage}: ${detail}`);
@@ -30,7 +31,7 @@ export function realtimeStage(stage: string, detail?: string | number) {
   else if (stage === "token-or-channel-rejected") { next = "channel-error"; error = "Token or room access was rejected."; }
   else if (stage === "channel-error") { next = "channel-error"; error = typeof detail === "string" ? detail : "Realtime channel failed."; }
   if (!next) return;
-  snapshot = { stage: next, error, recent: [...snapshot.recent, next].slice(-8) };
+  snapshot = { stage: next, error, recent: [...snapshot.recent, next].slice(-8), channelError: next === "channel-error" ? channelError ?? null : null };
   listeners.forEach((listener) => listener());
 }
 
@@ -44,6 +45,7 @@ export function realtimeErrorKind(error: unknown) {
 // Only return known Realtime error categories; never display server text that may
 // contain a token, request header, key, or other unexpected value.
 export function safeRealtimeChannelError(error: unknown) {
+  if (error == null) return "CHANNEL_ERROR callback contained no reason payload";
   const message = error instanceof Error ? error.message : "";
   if (/invalid.?jwt|invalid.*token|jwt.*(invalid|expired)|signature|token.*expired/i.test(message)) return "Supabase rejected the JWT (InvalidJWT).";
   if (/privateonly|private.only/i.test(message)) return "Supabase requires a private channel (PrivateOnly).";
@@ -53,4 +55,37 @@ export function safeRealtimeChannelError(error: unknown) {
   if (/realtimedisabledfortenant|realtime was disabled/i.test(message)) return "Supabase Realtime is disabled for this project.";
   if (/timeout|timed out/i.test(message)) return "Supabase channel subscription timed out.";
   return "Realtime channel failed (unrecognized server reason).";
+}
+
+const safeFields = ["message", "reason", "code", "status", "error", "type"] as const;
+
+function safeDiagnosticValue(value: unknown): string | null {
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value !== "string") return null;
+  if (/bearer\s|authorization|sb_(?:publishable|secret)_|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:token|secret|api[_-]?key|private[_-]?key|signing[_-]?jwk)\s*[:=]|[{}]/i.test(value)) return "[redacted sensitive value]";
+  return value.replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]").replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 180);
+}
+
+function inspectShape(value: unknown, inspectCause: boolean): RealtimeErrorShape {
+  const type = typeof value;
+  if (value === null || (type !== "object" && type !== "function")) {
+    return { type: value === null ? "null" : type, constructor: "none", keys: [], fields: safeDiagnosticValue(value) === null ? {} : { message: safeDiagnosticValue(value)! } };
+  }
+  const object = value as object;
+  const keys = Object.keys(object).slice(0, 20).map((key) => safeDiagnosticValue(key) ?? "[unknown]");
+  const constructor = safeDiagnosticValue(Object.getPrototypeOf(object)?.constructor?.name) ?? "unknown";
+  const fields: RealtimeErrorShape["fields"] = {};
+  for (const field of safeFields) {
+    const descriptor = Object.getOwnPropertyDescriptor(object, field);
+    if (!descriptor || !("value" in descriptor)) continue;
+    const safe = safeDiagnosticValue(descriptor.value);
+    if (safe !== null) fields[field] = safe;
+    else if (descriptor.value !== undefined) fields[field] = `[${typeof descriptor.value}; not displayed]`;
+  }
+  const cause = inspectCause ? Object.getOwnPropertyDescriptor(object, "cause") : undefined;
+  return { type, constructor, keys, fields, ...(cause && "value" in cause && cause.value !== undefined ? { cause: inspectShape(cause.value, false) } : {}) };
+}
+
+export function inspectRealtimeChannelError(value: unknown): RealtimeErrorShape | null {
+  return value == null ? null : inspectShape(value, true);
 }

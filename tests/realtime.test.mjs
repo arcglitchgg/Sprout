@@ -80,6 +80,20 @@ test("diagnostics classify failures without including raw authentication materia
   assert.equal(diagnostics.safeRealtimeChannelError(new Error("PrivateOnly")), "Supabase requires a private channel (PrivateOnly).");
   assert.equal(diagnostics.safeRealtimeChannelError(new Error("UnableToSetPolicies")), "Supabase could not evaluate the channel policies (UnableToSetPolicies).");
   assert.equal(diagnostics.safeRealtimeChannelError(new Error("secret-token-shaped-data")), "Realtime channel failed (unrecognized server reason).");
+  assert.equal(diagnostics.safeRealtimeChannelError(undefined), "CHANNEL_ERROR callback contained no reason payload");
+  const channelError = new Error("channel error: transport failure", { cause: { reason: "join refused", code: "ROOM_DENIED", token: "should-not-appear" } });
+  channelError.code = "Denied";
+  const shape = diagnostics.inspectRealtimeChannelError(channelError);
+  assert.equal(shape.type, "object");
+  assert.equal(shape.constructor, "Error");
+  assert.ok(shape.keys.includes("code"));
+  assert.equal(shape.fields.message, "channel error: transport failure");
+  assert.equal(shape.fields.code, "Denied");
+  assert.equal(shape.cause.fields.reason, "join refused");
+  assert.equal(shape.cause.fields.code, "ROOM_DENIED");
+  assert.ok(!JSON.stringify(shape).includes("should-not-appear"));
+  assert.equal(diagnostics.inspectRealtimeChannelError({ message: "Bearer secret", status: 403 }).fields.message, "[redacted sensitive value]");
+  assert.equal(diagnostics.inspectRealtimeChannelError(undefined), null);
 });
 
 test("farm room lifecycle tracks only identity, leaves on switch/return, and marks owner online/offline", async () => {
