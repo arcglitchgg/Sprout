@@ -11,7 +11,9 @@ export function createRealtimeToken(userId: string, now = Date.now(), keyJson = 
   const seconds = Math.floor(now / 1000);
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const header = encode({ alg: "ES256", typ: "JWT", kid: jwk.kid });
-  const payload = encode({ sub: userId, discord_user_id: userId, role: "authenticated", aud: "authenticated", iss: "sprout", iat: seconds, exp: seconds + REALTIME_TOKEN_SECONDS });
+  // Supabase documents `sub` as an optional UUID. Discord IDs are decimal strings,
+  // so the verified identity is carried only in this custom claim.
+  const payload = encode({ discord_user_id: userId, role: "authenticated", aud: "authenticated", iss: "sprout", iat: seconds, exp: seconds + REALTIME_TOKEN_SECONDS });
   const content = `${header}.${payload}`;
   const signature = sign("sha256", Buffer.from(content), { key: createPrivateKey({ key: jwk, format: "jwk" }), dsaEncoding: "ieee-p1363" }).toString("base64url");
   return { token: `${content}.${signature}`, expiresAt: (seconds + REALTIME_TOKEN_SECONDS) * 1000 };

@@ -28,3 +28,21 @@ Apply `migrations/20260922_farm_presence.sql` after the social migration. Config
 Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in local/Vercel client environments. Keep `SUPABASE_SECRET_KEY` server-only for the existing APIs. Import an ES256 P-256 JWT signing key into the Supabase project's JWT Signing Keys (activate it as directed by Supabase), and set `SUPABASE_REALTIME_SIGNING_JWK` to that same private JWK JSON **only on the Next.js server**. The JWK must include its `kid`. Never use a publishable key or the Sprout session secret as the signing key. The server verifies the existing Sprout session and signs a five-minute JWT with the server-derived Discord ID and `authenticated` role. The browser refreshes its room connection before expiry. If Realtime variables or signing are absent, the game continues without online presence.
 
 Presence carries only `userId`, `isOwner`, and `joinedAt`; it does not update Save V2. The visitor keeps the saved owner NPC pose, adding an online dot when owner Presence appears. A room member can still forge those visual payload fields, so Presence must not authorize gameplay, writes, or identity-sensitive features.
+
+### Repairing a partial Presence migration
+
+The original `20260922_farm_presence.sql` used plain `CREATE FUNCTION` and `CREATE POLICY`, so it cannot be rerun after any of those objects already exist. In the SQL Editor, inspect the current objects without reading credentials:
+
+```sql
+select to_regprocedure('public.can_join_sprout_farm(text,text)') as presence_function;
+select policyname, cmd, roles, qual, with_check
+from pg_policies where schemaname = 'realtime' and tablename = 'messages'
+  and policyname in ('sprout_farm_presence_read', 'sprout_farm_presence_write')
+order by policyname;
+```
+
+Run `migrations/20260923_farm_presence_repair.sql` in the Supabase SQL Editor **instead of rerunning 20260922**. It replaces the function and recreates the two Presence policies in one transaction. It is safe if the original migration was applied fully, stopped after the function, or was never applied, and safe to rerun. The repair does not touch players, friendships, game saves, or defense teams. Rerun the inspection query afterward; it should return one function and two policies (`SELECT` and `INSERT`).
+
+To diagnose the deployed Activity, set `NEXT_PUBLIC_REALTIME_DEBUG=1` for the Vercel environment under test and redeploy. Browser console messages prefixed `[Sprout Presence]` report token HTTP failures, authentication setup, subscription status, track result, and sync/join/leave counts. They never print tokens, keys, payloads, or Discord IDs. `token-fetch-failed: 401` means the Sprout session expired; `503` points to server signing configuration. `token-or-channel-rejected` means to check the Supabase signing-key `kid`, active key status, policies, and accepted friendship. `socket-or-network-failed` points to the Realtime connection. `subscribed` followed by `presence-track-ok` and `presence-synced` confirms the client path. Remove the debug flag and redeploy after testing.
+
+Verify that the Supabase project's Realtime setting disallows public channels, the imported ES256 key is active, and the server JWK's `kid` matches that key. `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` must be configured for the same project in Vercel and available at build time. `SUPABASE_REALTIME_SIGNING_JWK` stays server-only. These are configuration checks; local tests cannot prove a deployed Supabase project accepts the token.

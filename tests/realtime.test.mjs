@@ -37,6 +37,7 @@ test("Realtime token route derives identity from Sprout session and signs a five
   assert.deepEqual(JSON.parse(Buffer.from(header, "base64url").toString()), { alg: "ES256", typ: "JWT", kid: "test-key" });
   assert.equal(claims.discord_user_id, "11111");
   assert.equal(claims.role, "authenticated");
+  assert.equal("sub" in claims, false, "Discord snowflake IDs must not be used as UUID subjects");
   assert.equal(claims.exp - claims.iat, 300);
   assert.equal(issued.expiresAt, 1_300_000);
   assert.equal(verify("sha256", Buffer.from(`${header}.${body}`), { key: publicKey, dsaEncoding: "ieee-p1363" }, Buffer.from(signature, "base64url")), true);
@@ -69,6 +70,13 @@ test("Realtime token route derives identity from Sprout session and signs a five
   }
 });
 
+test("diagnostics classify failures without including raw authentication material", () => {
+  const diagnostics = loader()("@/lib/realtime-diagnostics");
+  assert.equal(diagnostics.realtimeErrorKind(new Error("Unauthorized access to Realtime channel")), "token-or-channel-rejected");
+  assert.equal(diagnostics.realtimeErrorKind(new Error("WebSocket connection timed out")), "socket-or-network-failed");
+  assert.equal(diagnostics.realtimeErrorKind(new Error("unrecognized failure")), "channel-error");
+});
+
 test("farm room lifecycle tracks only identity, leaves on switch/return, and marks owner online/offline", async () => {
   const effects = [];
   const stateUpdates = [];
@@ -82,9 +90,9 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
         const record = { room: "", removed: false, untracked: false, payload: null, sync: null, status: null };
         channels.push(record);
         const channel = {
-          on: (_type, _filter, callback) => { record.sync = callback; return channel; },
+          on: (_type, filter, callback) => { if (filter.event === "sync") record.sync = callback; return channel; },
           subscribe: (callback) => { record.status = callback; return channel; },
-          track: async (payload) => { record.payload = payload; },
+          track: async (payload) => { record.payload = payload; return "ok"; },
           presenceState: () => record.state ?? {},
           untrack: async () => { record.untracked = true; },
         };
@@ -146,6 +154,9 @@ test("private farm Presence policy allows owner and accepted friend, blocks stra
     await db.exec(readFileSync("supabase/migrations/20260920_cloud_saves.sql", "utf8"));
     await db.exec(readFileSync("supabase/migrations/20260921_social.sql", "utf8"));
     await db.exec(readFileSync("supabase/migrations/20260922_farm_presence.sql", "utf8"));
+    const repair = readFileSync("supabase/migrations/20260923_farm_presence_repair.sql", "utf8");
+    await db.exec(repair);
+    await db.exec(repair);
     await db.exec("insert into public.players(discord_user_id,username) values('11111','owner'),('22222','friend'),('33333','stranger'); insert into public.friend_links(user_low,user_high,requested_by,status) values('11111','22222','11111','accepted');");
     const allowed = async (actor, topic) => (await db.query("select public.can_join_sprout_farm($1,$2) as allowed", [topic, actor])).rows[0].allowed;
     assert.equal(await allowed("11111", "farm:11111"), true);
@@ -159,5 +170,20 @@ test("private farm Presence policy allows owner and accepted friend, blocks stra
     assert.ok(policies.every((p) => JSON.stringify(p).includes("presence") && !JSON.stringify(p).includes("broadcast")));
     assert.equal((await db.query("select has_function_privilege('anon','public.can_join_sprout_farm(text,text)','execute') as allowed")).rows[0].allowed, false);
     assert.equal((await db.query("select has_function_privilege('authenticated','public.can_join_sprout_farm(text,text)','execute') as allowed")).rows[0].allowed, true);
+  } finally { await db.close(); }
+});
+
+test("repair migration completes an earlier function-only Presence setup", async () => {
+  const db = new PGlite({ extensions: { pg_trgm } });
+  try {
+    await db.exec("create schema extensions; create schema realtime; create role anon; create role authenticated; create role service_role bypassrls; create table realtime.messages(extension text, topic text); create function realtime.topic() returns text language sql stable as $$ select current_setting('sprout.test_topic', true) $$;");
+    await db.exec(readFileSync("supabase/migrations/20260920_cloud_saves.sql", "utf8"));
+    await db.exec(readFileSync("supabase/migrations/20260921_social.sql", "utf8"));
+    await db.exec(readFileSync("supabase/migrations/20260922_farm_presence.sql", "utf8").split("create policy sprout_farm_presence_read")[0]);
+    assert.equal((await db.query("select count(*)::int as count from pg_policies where schemaname='realtime' and tablename='messages'")).rows[0].count, 0);
+    await db.exec(readFileSync("supabase/migrations/20260923_farm_presence_repair.sql", "utf8"));
+    assert.equal((await db.query("select count(*)::int as count from pg_policies where schemaname='realtime' and tablename='messages'")).rows[0].count, 2);
+    await db.exec("insert into public.players(discord_user_id,username) values('11111','owner'),('22222','friend'); insert into public.friend_links(user_low,user_high,requested_by,status) values('11111','22222','11111','accepted');");
+    assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','22222') as allowed")).rows[0].allowed, true);
   } finally { await db.close(); }
 });
