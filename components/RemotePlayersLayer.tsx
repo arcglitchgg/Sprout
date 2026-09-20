@@ -4,11 +4,13 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import WorldPlayerEntity from "@/components/WorldPlayerEntity";
 import { FARMER_ANIMATION } from "@/lib/sprite-data";
 import { remoteWorldPlayer, type RemoteMovementStore } from "@/lib/remote-movement";
+import { playerName } from "@/lib/challenges";
 import type { WorldPlayer } from "@/lib/social-types";
 
-export default function RemotePlayersLayer({ store, localId, ownerId, ownerName, ownerFallback, ownerOnline, labelScale, onInteract }: {
+export default function RemotePlayersLayer({ store, localId, ownerId, ownerName, ownerFallback, ownerOnline, profiles, labelScale, onInteract }: {
   store: RemoteMovementStore; localId: string | null; ownerId: string | null;
   ownerName: string | null; ownerFallback: { x: number; y: number };
+  profiles: Record<string, { displayName: string | null; username: string }>;
   ownerOnline: boolean; labelScale: number; onInteract: (player: WorldPlayer) => void;
 }) {
   const remotes = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -32,7 +34,7 @@ export default function RemotePlayersLayer({ store, localId, ownerId, ownerName,
 
   const players = remotes.filter((remote) => remote.userId !== localId && (remote.userId !== ownerId || ownerOnline))
     .map((remote) => ({
-      ...remoteWorldPlayer(remote, remote.userId === ownerId ? ownerName ?? "Farm owner" : `Farmer …${remote.userId.slice(-4)}`, ownerId ?? ""),
+      ...remoteWorldPlayer(remote, playerName(remote.userId, profiles, ownerId ? { userId: ownerId, displayName: ownerName } : null), ownerId ?? ""),
       frame: remote.moving ? FARMER_ANIMATION.walkFrames[frameIndex] : FARMER_ANIMATION.idleFrame,
     }));
   if (ownerId && !players.some((player) => player.userId === ownerId)) {

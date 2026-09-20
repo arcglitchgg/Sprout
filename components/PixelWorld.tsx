@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import WorldMap from "@/components/WorldMap";
@@ -17,6 +17,8 @@ import { findPath, findPathToAdjacent } from "@/lib/pathfinding";
 import { canModifyFarm } from "@/lib/social";
 import type { FriendFarmSnapshot, WorldContext, WorldPlayer } from "@/lib/social-types";
 import { useFarmPresence } from "@/hooks/useFarmPresence";
+import { playerInRange, playerName } from "@/lib/challenges";
+import { socialRequest } from "@/lib/social-client";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
 import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
@@ -72,7 +74,20 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const plots = context.mode === "visiting" ? context.snapshot.plots : ownPlots;
   const unlockedPlotCount = context.mode === "visiting" ? context.snapshot.unlockedPlotCount : ownUnlockedPlotCount;
   const { user, session } = useDiscord();
-  const { ownerOnline, presentIds, remoteStore, updateLocalMovement } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
+  const { ownerOnline, presentIds, remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
+  const [remoteProfiles, setRemoteProfiles] = useState<Record<string, { displayName: string | null; username: string }>>({});
+  const [challengeTarget, setChallengeTarget] = useState<{ userId: string; displayName: string } | null>(null);
+  const roomIds = presentIds.filter((id) => id !== user?.id).join(",");
+  const presentIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => { presentIdsRef.current = new Set(presentIds); }, [presentIds]);
+  useEffect(() => {
+    if (!session || !roomIds) return;
+    const controller = new AbortController();
+    socialRequest<{ players: { userId: string; displayName: string | null; username: string }[] }>(session, `/api/players/profiles?ids=${roomIds}`, "GET", undefined, controller.signal)
+      .then(({ players }) => { if (!controller.signal.aborted) setRemoteProfiles(Object.fromEntries(players.map((profile) => [profile.userId, profile]))); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [session, roomIds]);
   const visitorCount = !visiting && user ? presentIds.filter((id) => id !== user.id).length : 0;
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: visiting ? FIRST_WORLD.start : initialFarmerTile, initialFacing: visiting ? "right" : initialFarmerFacing, onSettled: visiting ? undefined : onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -87,7 +102,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const [marketOpen, setMarketOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [ownerPrompt, setOwnerPrompt] = useState<string | null>(null);
-  const modalOpen = farmhouseOpen || marketOpen || friendsOpen || dungeonOpen || seedShopOpen || ownerPrompt !== null;
+  const modalOpen = farmhouseOpen || marketOpen || friendsOpen || dungeonOpen || seedShopOpen || ownerPrompt !== null || challengeTarget !== null || challenge !== null;
   const [debug, setDebug] = useState(false);
 
   useEffect(() => {
@@ -127,6 +142,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
     setMarketOpen(false);
     setFriendsOpen(false);
     setOwnerPrompt(null);
+    setChallengeTarget(null);
   }
 
   function arriveAtPlot(plotId: number) {
@@ -218,7 +234,25 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   }];
 
   function selectPlayer(player: WorldPlayer) {
-    if (modalOpen || !visiting || !player.isOwner || player.isLocal) return;
+    if (modalOpen || player.isLocal) return;
+    if (player.online && presentIds.includes(player.userId)) {
+      closeInteraction();
+      const targetId = player.userId;
+      const target = remoteStore.getSnapshot().find((entry) => entry.userId === targetId);
+      const targetPosition = target ? { x: target.currentX, y: target.currentY } : player;
+      const route = findPathToAdjacent(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, worldToCell(FIRST_WORLD, targetPosition));
+      if (!route) { notify({ kind: "error", title: "That player cannot be reached." }); return; }
+      moveTo(route.destination, () => {
+        const current = remoteStore.getSnapshot().find((entry) => entry.userId === targetId);
+        const currentPosition = current ? { x: current.currentX, y: current.currentY } : player;
+        if (!presentIdsRef.current.has(targetId) || !playerInRange(cellToWorld(FIRST_WORLD, route.destination), currentPosition)) {
+          notify({ kind: "info", title: "That player moved away." }); return;
+        }
+        setChallengeTarget({ userId: targetId, displayName: playerName(targetId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null) });
+      });
+      return;
+    }
+    if (!visiting || !player.isOwner) return;
     closeInteraction();
     const route = findPathToAdjacent(FIRST_WORLD.blocked, FIRST_WORLD.width, FIRST_WORLD.height, state.tile, worldToCell(FIRST_WORLD, player));
     if (!route) { notify({ kind: "error", title: "The farm owner cannot be reached." }); return; }
@@ -239,8 +273,8 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
     <section className="relative flex h-full min-h-0 flex-col">
       <div className="mb-2 flex shrink-0 flex-wrap items-end justify-between gap-2 px-1 text-[#e8eadf]">
         <div>
-          <h2 className="max-w-64 truncate text-base font-bold sm:text-lg">{context.mode === "visiting" ? `${context.snapshot.owner.displayName ?? context.snapshot.owner.username}'s farm · Lv ${context.snapshot.owner.farmLevel}` : "Sprout Valley"}</h2>
-          <p className="hidden text-xs text-[#b9c1b9] sm:block">{visiting ? "Visiting · View-only. Walk around or talk to the farm owner." : "Click or tap to walk. Visit the shops, plots, Dungeon, or Friends exit."}</p>
+          <h2 className="max-w-64 truncate text-base font-bold sm:text-lg">{context.mode === "visiting" ? `${context.snapshot.owner.displayName ?? context.snapshot.owner.username}'s farm Â· Lv ${context.snapshot.owner.farmLevel}` : "Sprout Valley"}</h2>
+          <p className="hidden text-xs text-[#b9c1b9] sm:block">{visiting ? "Visiting Â· View-only. Walk around or talk to the farm owner." : "Click or tap to walk. Visit the shops, plots, Dungeon, or Friends exit."}</p>
           {visitorCount > 0 && <p className="text-xs text-lime-300">{visitorCount} visitor{visitorCount === 1 ? "" : "s"} online</p>}
         </div>
         {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-3 py-2 text-xs font-bold text-[#4a2c12]">Return Home</button>}
@@ -255,7 +289,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
           <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
-          <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
+          <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
       </div>
@@ -264,17 +298,17 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
         <div className="absolute bottom-5 left-1/2 z-50 w-[min(92%,420px)] -translate-x-1/2 rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-[#2f3e2f] shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <strong>Plant Plot {plantingPlot.id + 1}</strong>
-            <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close planting panel">×</button>
+            <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close planting panel">Ã—</button>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(crops) as CropType[]).map((cropKey) => (
               <button key={cropKey} type="button" disabled={seeds[cropKey] === 0} onClick={() => setSelectedCrop(cropKey)} className={`rounded-lg border-2 p-2 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${selectedCrop === cropKey ? "border-[#4f772d] bg-[#d9ed92]" : "border-transparent bg-white/60"}`}>
                 <span className="block text-xl">{crops[cropKey].emoji}</span>
-                {crops[cropKey].name} · Owned: {seeds[cropKey]}
+                {crops[cropKey].name} Â· Owned: {seeds[cropKey]}
               </button>
             ))}
           </div>
-          {seeds[selectedCrop] === 0 && <p className="mt-3 text-center text-sm font-bold text-[#8a351f]">No {crops[selectedCrop].name} seeds — visit the Seed Store.</p>}
+          {seeds[selectedCrop] === 0 && <p className="mt-3 text-center text-sm font-bold text-[#8a351f]">No {crops[selectedCrop].name} seeds â€” visit the Seed Store.</p>}
           <button type="button" onClick={plantSelectedCrop} disabled={seeds[selectedCrop] === 0} className="mt-3 w-full rounded-lg bg-[#4f772d] px-3 py-2 font-bold text-white disabled:opacity-40">
             Plant {crops[selectedCrop].name}
           </button>
@@ -283,8 +317,8 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
 
       {growingPlot?.crop && (
         <div className="absolute bottom-5 left-1/2 z-50 flex w-[min(92%,360px)] -translate-x-1/2 items-center justify-between rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-sm text-[#2f3e2f] shadow-xl">
-          <span><strong>{crops[growingPlot.crop].name}</strong> · {isReady(growingPlot, now) ? visiting ? "Ready · View-only" : "Ready — click the plot again" : `${getSecondsRemaining(growingPlot, now)}s remaining`}</span>
-          <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close crop status">×</button>
+          <span><strong>{crops[growingPlot.crop].name}</strong> Â· {isReady(growingPlot, now) ? visiting ? "Ready Â· View-only" : "Ready â€” click the plot again" : `${getSecondsRemaining(growingPlot, now)}s remaining`}</span>
+          <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close crop status">Ã—</button>
         </div>
       )}
 
@@ -293,7 +327,16 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       {!visiting && farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
       {!visiting && marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
       {friendsOpen && <WorldFriendsOverlay fighters={fighters} onVisit={onVisit} onClose={() => setFriendsOpen(false)} presenceOwnerId={context.mode === "visiting" ? context.ownerId : user?.id ?? null} presenceRole={visiting ? "visitor" : "owner"} presenceMemberCount={presentIds.length} />}
-      {ownerPrompt !== null && <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Challenge farm owner"><div className="w-full max-w-sm rounded-xl bg-[#fff8dc] p-5 text-[#2f3e2f]"><h3 className="break-words text-lg font-bold">Challenge {ownerPrompt}?</h3><p className="my-3 text-sm">Farm battles are coming next.</p><div className="flex gap-2"><button type="button" disabled className="rounded-lg bg-[#4f772d] px-3 py-2 text-white opacity-40">Battle · Coming next</button><button type="button" onClick={() => setOwnerPrompt(null)} className="rounded-lg border border-[#765438] px-3 py-2 font-bold">Cancel</button></div></div></div>}
+      {ownerPrompt !== null && <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Challenge farm owner"><div className="w-full max-w-sm rounded-xl bg-[#fff8dc] p-5 text-[#2f3e2f]"><h3 className="break-words text-lg font-bold">Challenge {ownerPrompt}?</h3><p className="my-3 text-sm">Farm battles are coming next.</p><div className="flex gap-2"><button type="button" disabled className="rounded-lg bg-[#4f772d] px-3 py-2 text-white opacity-40">Battle Â· Coming next</button><button type="button" onClick={() => setOwnerPrompt(null)} className="rounded-lg border border-[#765438] px-3 py-2 font-bold">Cancel</button></div></div></div>}
+      {(challengeTarget || challenge || challengeMessage) && <div className="absolute inset-0 z-[76] flex items-center justify-center bg-black/50 p-3" role="dialog" aria-modal="true" aria-label="Player challenge"><div className="w-full max-w-sm rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-4 text-[#2f3e2f] shadow-xl">
+        <h3 className="text-lg font-bold">{challenge?.status === "accepted" ? "Challenge accepted â€” Battle coming next" : challenge?.role === "incoming" ? `${playerName(challenge.packet.fromUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)} challenged you!` : challenge?.role === "outgoing" ? `Waiting for ${playerName(challenge.packet.toUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)}...` : challengeTarget ? `Challenge ${challengeTarget.displayName}?` : challengeMessage}</h3>
+        {challengeMessage && challenge && <p className="mt-2 text-sm">{challengeMessage}</p>}
+        <div className="mt-4 flex gap-2">
+          {challengeTarget && !challenge && <button type="button" className="rounded-lg bg-[#4f772d] px-3 py-2 font-bold text-white" onClick={() => { void requestChallenge(challengeTarget.userId).then((sent) => { if (!sent) notify({ kind: "error", title: "Player is unavailable or busy." }); }); setChallengeTarget(null); }}>Challenge</button>}
+          {challenge?.role === "incoming" && challenge.status === "pending" && <><button type="button" className="rounded-lg bg-[#4f772d] px-3 py-2 font-bold text-white" onClick={() => void respondChallenge(true)}>Accept</button><button type="button" className="rounded-lg border border-[#765438] px-3 py-2 font-bold" onClick={() => void respondChallenge(false)}>Decline</button></>}
+          {(challenge?.role !== "incoming" || challenge.status === "accepted") && <button type="button" className="rounded-lg border border-[#765438] px-3 py-2 font-bold" onClick={() => { setChallengeTarget(null); dismissChallenge(); }}>{challenge?.role === "outgoing" && challenge.status === "pending" ? "Cancel challenge" : "Close"}</button>}
+        </div>
+      </div></div>}
     </section>
   );
 }

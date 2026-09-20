@@ -79,6 +79,7 @@ test("social API routes require sessions and ignore spoofed actor IDs and defens
         const body = init?.body ? JSON.parse(init.body) : undefined;
         calls.push({ path, body });
         if (path.startsWith("friend_links?")) return Response.json([]);
+        if (path.startsWith("players?discord_user_id=in.")) return Response.json([{ discord_user_id: "22222", username: "bob", display_name: "Bob" }]);
         if (path === "rpc/get_sprout_defense") return Response.json({ revision: 7, fighters: [] });
         if (path === "rpc/get_sprout_friend_farm") return Response.json(farmAllowed ? { profile: { discord_user_id: "22222", username: "bob", farm_level: 3, coins: 100, combat_power: 0, pvp_wins: 0, private_backend_field: "hidden" }, save: save() } : null);
         if (path === "rpc/search_sprout_players") return Response.json([{ discord_user_id: "11111", username: "actor" }, { discord_user_id: "22222", username: "bob", farm_level: 1, coins: 100, combat_power: 0, pvp_wins: 0, private_backend_field: "hidden" }]);
@@ -108,6 +109,11 @@ test("social API routes require sessions and ignore spoofed actor IDs and defens
   const searchRoute = serverLoad("@/app/api/players/search/route");
   const search = await (await searchRoute.GET(request("/api/players/search?q=bo"))).json();
   assert.deepEqual(search.players.map((p) => p.userId), ["22222"]);
+  const profileRoute = serverLoad("@/app/api/players/profiles/route");
+  assert.equal((await profileRoute.GET(request("/api/players/profiles?ids=22222", "GET", undefined, false))).status, 401);
+  const names = await (await profileRoute.GET(request("/api/players/profiles?ids=22222"))).json();
+  assert.deepEqual(names.players, [{ userId: "22222", username: "bob", displayName: "Bob" }]);
+  assert.equal((await profileRoute.GET(request("/api/players/profiles?ids=bad"))).status, 400);
 });
 
 function walkElements(element, predicate) {
@@ -122,10 +128,12 @@ test("visiting uses snapshot plots, blocks every farm mutation, and never persis
   let returned = false;
   let arrival;
   let deferArrival = false;
+  let livePresence = false;
   const stateUpdates = [];
   const uiMocks = {
-    react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, (value) => stateUpdates.push(value)], useRef: (value) => ({ current: value }), useEffect: () => {}, useMemo: (value) => value(), useCallback: (value) => value },
+    react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, (value) => stateUpdates.push(value)], useRef: (value) => ({ current: value }), useEffect: (effect, deps) => { if (deps?.length === 1 && Array.isArray(deps[0])) effect(); }, useMemo: (value) => value(), useCallback: (value) => value },
     "@/hooks/useDiscord": { useDiscord: () => ({ user: { id: "11111", username: "Alice" } }) },
+    "@/hooks/useFarmPresence": { useFarmPresence: () => ({ ownerOnline: livePresence, presentIds: livePresence ? ["11111", "22222"] : [], remoteStore: { getSnapshot: () => livePresence ? [{ userId: "22222", currentX: 730, currentY: 500 }] : [] }, updateLocalMovement: () => {}, challenge: null, challengeMessage: null, requestChallenge: async () => true, respondChallenge: async () => {}, dismissChallenge: () => {} }) },
     "@/hooks/useWorldMovement": { useWorldMovement: (_world, options) => {
       movementOptions = options;
       return { state: { tile: FIRST_WORLD.start, position: FIRST_WORLD.start, facing: "right", moving: false, frame: 0 }, moveTo: (_tile, onArrival) => { if (deferArrival) arrival = onArrival; else onArrival?.(); }, cancelInteraction: () => {} };
@@ -167,6 +175,16 @@ test("visiting uses snapshot plots, blocks every farm mutation, and never persis
   assert.equal(remoteLayer.props.ownerId, "22222");
   assert.equal(remoteLayer.props.ownerName, "Bob");
   assert.equal(homeMap.props.players.length, 1);
+  livePresence = true;
+  const liveScene = wrapped.type({ ...wrapped.props, context: { mode: "visiting", ownerId: "22222", snapshot }, onReturnHome: () => {} });
+  const liveLayer = walkElements(liveScene, (e) => e.type === "RemotePlayersLayer")[0];
+  deferArrival = true;
+  stateUpdates.length = 0;
+  liveLayer.props.onInteract({ userId: "22222", displayName: "Bob", x: 730, y: 500, isOwner: true, isLocal: false, online: true });
+  assert.equal(typeof arrival, "function", "live player click should path into range");
+  arrival();
+  assert.ok(stateUpdates.some((value) => value?.userId === "22222" && value.displayName === "Bob"), "arrival opens a local challenge prompt");
+  livePresence = false;
   deferArrival = true;
   stateUpdates.length = 0;
   homeMap.props.onBuildingClick("world-exit");

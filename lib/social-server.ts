@@ -57,6 +57,13 @@ export async function searchPlayers(actor: string, query: string) {
   return { players: found.filter((row) => row.discord_user_id !== actor).slice(0, 20).map(publicProfile) };
 }
 
+export async function lookupPlayerNames(rawIds: string) {
+  const ids = [...new Set(rawIds.split(","))];
+  if (ids.length > 20 || ids.some((id) => !/^\d{5,25}$/.test(id))) throw new SocialError(400, "Invalid player IDs.");
+  const found = rows(await database(`players?discord_user_id=in.(${ids.join(",")})&select=discord_user_id,username,display_name`));
+  return { players: found.map((row) => ({ userId: String(row.discord_user_id), username: String(row.username), displayName: typeof row.display_name === "string" ? row.display_name : null })) };
+}
+
 export async function listFriends(actor: string): Promise<FriendLists> {
   const links = rows(await database(`friend_links?or=(user_low.eq.${actor},user_high.eq.${actor})&select=user_low,user_high,requested_by,status&order=created_at.desc`));
   const ids = [...new Set(links.map((link) => link.user_low === actor ? link.user_high : link.user_low))];

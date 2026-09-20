@@ -245,3 +245,83 @@ test("movement Broadcast policies reuse farm membership without broadening Prese
     assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','33333') as allowed")).rows[0].allowed, false);
   } finally { await db.close(); }
 });
+
+test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and room cleanup", async () => {
+  const effects = [];
+  const updates = [];
+  const callbacks = new Map();
+  const sent = [];
+  const intervals = [];
+  let status;
+  let roomState = { a: [{ userId: "11111", isOwner: true }], b: [{ userId: "22222", isOwner: false }], c: [{ userId: "33333", isOwner: false }] };
+  const channel = {
+    on: (type, filter, callback) => { callbacks.set(`${type}:${filter.event}`, callback); return channel; },
+    subscribe: (callback) => { status = callback; return channel; },
+    track: async () => "ok", send: async (message) => { sent.push(message); return "ok"; },
+    presenceState: () => roomState, untrack: async () => {},
+  };
+  const hook = loader({
+    react: { useState: (value) => [value, (next) => updates.push(next)], useEffect: (effect) => effects.push(effect), useMemo: (factory) => factory(), useRef: (value) => ({ current: value }), useCallback: (callback) => callback },
+    "@/lib/realtime-client": { requestRealtimeToken: async () => ({ token: "signed" }), createRealtimeClient: () => ({ realtime: { setAuth: async () => {} }, channel: () => channel, removeChannel: async () => {} }) },
+  })("@/hooks/useFarmPresence");
+  const env = { ...process.env };
+  const oldWindow = globalThis.window;
+  globalThis.window = { setInterval: (callback) => { intervals.push(callback); return intervals.length; }, clearInterval: () => {} };
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_test";
+  try {
+    const runtime = hook.useFarmPresence("session", "11111", "11111");
+    const cleanup = effects.pop()();
+    await new Promise((resolve) => setImmediate(resolve));
+    status("SUBSCRIBED");
+    callbacks.get("presence:sync")();
+    assert.equal(await runtime.requestChallenge("11111"), false, "self blocked");
+    assert.equal(await runtime.requestChallenge("99999"), false, "absent target blocked");
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    assert.equal(await runtime.requestChallenge("33333"), false, "one outgoing challenge at a time");
+    const request = sent.find((entry) => entry.event === "challenge-request").payload;
+    callbacks.get("broadcast:challenge-busy")({ payload: request });
+    assert.ok(updates.includes("Player is busy"));
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    const second = sent.filter((entry) => entry.event === "challenge-request").at(-1).payload;
+    callbacks.get("broadcast:challenge-decline")({ payload: second });
+    assert.ok(updates.includes("Challenge declined"));
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    const third = sent.filter((entry) => entry.event === "challenge-request").at(-1).payload;
+    callbacks.get("broadcast:challenge-accept")({ payload: third });
+    assert.ok(updates.includes("Challenge accepted — Battle coming next"));
+    runtime.dismissChallenge();
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    runtime.dismissChallenge();
+    assert.equal(sent.at(-1).event, "challenge-cancel");
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    const expiring = sent.filter((entry) => entry.event === "challenge-request").at(-1).payload;
+    const actualNow = Date.now;
+    try { Date.now = () => expiring.expiresAt; intervals[1](); }
+    finally { Date.now = actualNow; }
+    assert.ok(updates.includes("Challenge expired"));
+    assert.equal(await runtime.requestChallenge("22222"), true);
+    roomState = { a: [{ userId: "11111", isOwner: true }] };
+    callbacks.get("presence:sync")();
+    assert.ok(updates.includes("Player left the farm."));
+    roomState = { a: [{ userId: "11111", isOwner: true }], b: [{ userId: "22222", isOwner: false }] };
+    callbacks.get("presence:sync")();
+    const incomingAt = Date.now();
+    const incoming = { challengeId: "incoming-123", fromUserId: "22222", toUserId: "11111", createdAt: incomingAt, expiresAt: incomingAt + 15000 };
+    callbacks.get("broadcast:challenge-request")({ payload: incoming });
+    const extra = { ...incoming, challengeId: "incoming-456" };
+    callbacks.get("broadcast:challenge-request")({ payload: extra });
+    assert.equal(sent.at(-1).event, "challenge-busy");
+    await runtime.respondChallenge(true);
+    assert.equal(sent.at(-1).event, "challenge-accept");
+    runtime.dismissChallenge();
+    callbacks.get("broadcast:challenge-request")({ payload: extra });
+    await runtime.respondChallenge(false);
+    assert.equal(sent.at(-1).event, "challenge-decline");
+    callbacks.get("broadcast:challenge-request")({ payload: incoming });
+    callbacks.get("broadcast:challenge-cancel")({ payload: incoming });
+    assert.ok(updates.includes("Challenge cancelled"));
+    cleanup();
+    assert.equal(runtime.remoteStore.getSnapshot().length, 0);
+  } finally { process.env = env; globalThis.window = oldWindow; }
+});

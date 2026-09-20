@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRealtimeClient, RealtimeTokenError, requestRealtimeToken } from "@/lib/realtime-client";
 import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, realtimeTransportEvent, safeRealtimeChannelError, safeRealtimeCloseReason, safeRealtimeHostname } from "@/lib/realtime-diagnostics";
 import { shouldSendMovement, createRemoteMovementStore, type RemoteMovementPacket } from "@/lib/remote-movement";
+import { CHALLENGE_MS, validChallengePacket, type ChallengeEvent, type ChallengePacket, type ChallengeState } from "@/lib/challenges";
 
 export function farmRoom(ownerId: string) {
   if (!/^\d{5,25}$/.test(ownerId)) throw new Error("Invalid farm owner.");
@@ -23,6 +24,36 @@ export function presentUserIds(state: Record<string, unknown[]>) {
 export function useFarmPresence(session: string | null, userId: string | null, ownerId: string | null) {
   const [ownerOnline, setOwnerOnline] = useState(false);
   const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [challenge, setChallenge] = useState<ChallengeState | null>(null);
+  const [challengeMessage, setChallengeMessage] = useState<string | null>(null);
+  const challengeRef = useRef<ChallengeState | null>(null);
+  const challengeSend = useRef<((event: ChallengeEvent, packet: ChallengePacket) => Promise<boolean>) | null>(null);
+  const membersRef = useRef<Set<string>>(new Set());
+  const changeChallenge = useCallback((next: ChallengeState | null) => { challengeRef.current = next; setChallenge(next); }, []);
+  const requestChallenge = useCallback(async (targetId: string) => {
+    if (!userId || targetId === userId || challengeRef.current || !membersRef.current.has(targetId) || !challengeSend.current) return false;
+    const createdAt = Date.now();
+    const packet = { challengeId: crypto.randomUUID(), fromUserId: userId, toUserId: targetId, createdAt, expiresAt: createdAt + CHALLENGE_MS };
+    changeChallenge({ role: "outgoing", status: "pending", packet });
+    setChallengeMessage(null);
+    if (await challengeSend.current("challenge-request", packet)) return true;
+    const pending = challengeRef.current as ChallengeState | null;
+    if (pending?.packet.challengeId === packet.challengeId) changeChallenge(null);
+    setChallengeMessage("Challenge could not be sent.");
+    return false;
+  }, [userId, changeChallenge]);
+  const respondChallenge = useCallback(async (accept: boolean) => {
+    const active = challengeRef.current;
+    if (!active || active.role !== "incoming" || active.status !== "pending" || !challengeSend.current) return;
+    if (!await challengeSend.current(accept ? "challenge-accept" : "challenge-decline", active.packet)) { setChallengeMessage("Could not send your response."); return; }
+    changeChallenge(accept ? { ...active, status: "accepted" } : null);
+    setChallengeMessage(accept ? "Challenge accepted — Battle coming next" : null);
+  }, [changeChallenge]);
+  const dismissChallenge = useCallback(() => {
+    const active = challengeRef.current;
+    if (active?.role === "outgoing" && active.status === "pending") void challengeSend.current?.("challenge-cancel", active.packet);
+    changeChallenge(null); setChallengeMessage(null);
+  }, [changeChallenge]);
   const remoteStore = useMemo(() => createRemoteMovementStore(), []);
   const latestLocal = useRef<Omit<RemoteMovementPacket, "userId" | "seq" | "timestamp"> | null>(null);
   const sendRef = useRef<((movement: NonNullable<typeof latestLocal.current>, force: boolean) => void) | null>(null);
@@ -43,6 +74,9 @@ export function useFarmPresence(session: string | null, userId: string | null, o
       setPresentIds([]);
       remoteStore.clear();
       sendRef.current = null;
+      challengeSend.current = null;
+      membersRef.current = new Set();
+      changeChallenge(null);
       try {
         realtimeStage("token-fetch-start");
         const credentials = await requestRealtimeToken(session!, controller.signal);
@@ -79,6 +113,11 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         let lastSentAt = 0;
         let sequence = 0;
         let members = new Set<string>();
+        challengeSend.current = async (event, packet) => {
+          if (!subscribed || closed) return false;
+          try { return await channel.send({ type: "broadcast", event, payload: packet }) === "ok"; }
+          catch { return false; }
+        };
         sendRef.current = (movement, force) => {
           if (!subscribed || closed || (!force && !shouldSendMovement(lastSent, Date.now() - lastSentAt, movement))) return;
           const timestamp = Date.now();
@@ -91,6 +130,25 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         channel.on("broadcast", { event: "movement" }, ({ payload }) => {
           if (!closed) remoteStore.apply(payload, members, userId!, Date.now());
         });
+        for (const event of ["challenge-request", "challenge-accept", "challenge-decline", "challenge-cancel", "challenge-busy"] as ChallengeEvent[]) {
+          channel.on("broadcast", { event }, ({ payload }) => {
+            if (closed || !validChallengePacket(payload, members, Date.now())) return;
+            const packet = payload as ChallengePacket;
+            if (event === "challenge-request") {
+              if (packet.toUserId !== userId) return;
+              if (challengeRef.current) { void challengeSend.current?.("challenge-busy", packet); return; }
+              changeChallenge({ role: "incoming", status: "pending", packet });
+              setChallengeMessage(null);
+              return;
+            }
+            const active = challengeRef.current;
+            if (!active || active.packet.challengeId !== packet.challengeId || active.packet.fromUserId !== packet.fromUserId || active.packet.toUserId !== packet.toUserId) return;
+            if (active.role === "outgoing" && packet.fromUserId === userId) {
+              if (event === "challenge-accept") { changeChallenge({ ...active, status: "accepted" }); setChallengeMessage("Challenge accepted — Battle coming next"); }
+              if (event === "challenge-decline" || event === "challenge-busy") { changeChallenge(null); setChallengeMessage(event === "challenge-busy" ? "Player is busy" : "Challenge declined"); }
+            } else if (active.role === "incoming" && event === "challenge-cancel") { changeChallenge(null); setChallengeMessage("Challenge cancelled"); }
+          });
+        }
         channel.on("presence", { event: "sync" }, () => {
           if (!closed) {
             const state = channel.presenceState() as Record<string, unknown[]>;
@@ -98,7 +156,10 @@ export function useFarmPresence(session: string | null, userId: string | null, o
             const ids = presentUserIds(state);
             const joined = ids.some((id) => id !== userId && !members.has(id));
             members = new Set(ids);
+            membersRef.current = members;
             remoteStore.retain(members);
+            const active = challengeRef.current;
+            if (active && !members.has(active.role === "outgoing" ? active.packet.toUserId : active.packet.fromUserId)) { changeChallenge(null); setChallengeMessage("Player left the farm."); }
             setPresentIds(ids);
             if (joined && latestLocal.current) sendRef.current?.(latestLocal.current, true);
             realtimeStage("presence-synced", ids.length);
@@ -125,12 +186,13 @@ export function useFarmPresence(session: string | null, userId: string | null, o
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             subscribed = false;
             remoteStore.clear();
+            challengeSend.current = null; membersRef.current = new Set(); changeChallenge(null);
             if (status === "CHANNEL_ERROR") realtimeStage("channel-error", safeRealtimeChannelError(error), inspectRealtimeChannelError(error) ?? undefined);
             else realtimeStage(status === "TIMED_OUT" ? "socket-or-network-failed" : "channel-closed");
             setOwnerOnline(false); setPresentIds([]);
           }
         });
-        cleanup = () => { subscribed = false; sendRef.current = null; remoteStore.clear(); realtimeStage("leaving-room"); void channel.untrack().catch(() => {}); void client.removeChannel(channel); };
+        cleanup = () => { subscribed = false; sendRef.current = null; challengeSend.current = null; membersRef.current = new Set(); changeChallenge(null); remoteStore.clear(); realtimeStage("leaving-room"); void channel.untrack().catch(() => {}); void client.removeChannel(channel); };
       } catch (error) {
         if (!closed) {
           realtimeStage(error instanceof RealtimeTokenError ? "token-fetch-failed" : realtimeErrorKind(error), error instanceof RealtimeTokenError ? error.status : undefined);
@@ -141,8 +203,12 @@ export function useFarmPresence(session: string | null, userId: string | null, o
     }
     void connect();
     const refresh = window.setInterval(() => { void connect(); }, 240_000);
-    return () => { closed = true; controller.abort(); window.clearInterval(refresh); sendRef.current = null; remoteStore.clear(); cleanup?.(); };
-  }, [session, userId, ownerId, remoteStore]);
+    const timeout = window.setInterval(() => {
+      const active = challengeRef.current;
+      if (active?.status === "pending" && Date.now() >= active.packet.expiresAt) { changeChallenge(null); setChallengeMessage(active.role === "outgoing" ? "Challenge expired" : null); }
+    }, 250);
+    return () => { closed = true; controller.abort(); window.clearInterval(refresh); window.clearInterval(timeout); sendRef.current = null; challengeSend.current = null; membersRef.current = new Set(); remoteStore.clear(); cleanup?.(); };
+  }, [session, userId, ownerId, remoteStore, changeChallenge]);
   const active = !!(session && userId && ownerId);
-  return { ownerOnline: active && ownerOnline, presentIds: active ? presentIds : [], remoteStore, updateLocalMovement };
+  return { ownerOnline: active && ownerOnline, presentIds: active ? presentIds : [], remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge };
 }
