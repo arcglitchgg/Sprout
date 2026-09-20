@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useDiscord } from "@/hooks/useDiscord";
 import { socialRequest } from "@/lib/social-client";
 import FighterCard from "@/components/FighterCard";
 import type { Fighter } from "@/lib/game-types";
 import type { DefenseTeam, FriendAction, FriendFarmSnapshot, FriendLists, SproutProfile } from "@/lib/social-types";
+import { getRealtimeDiagnostics, subscribeRealtimeDiagnostics } from "@/lib/realtime-diagnostics";
 
 const button = "rounded-lg bg-[#4f772d] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40";
 type Tab = "friends" | "requests" | "search" | "defense";
 
-export default function WorldFriendsOverlay({ fighters, onVisit, onClose }: {
+export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presenceOwnerId, presenceRole, presenceMemberCount }: {
   fighters: Fighter[]; onVisit: (snapshot: FriendFarmSnapshot) => void; onClose: () => void;
+  presenceOwnerId: string | null; presenceRole: "owner" | "visitor"; presenceMemberCount: number;
 }) {
   const { session } = useDiscord();
   const [tab, setTab] = useState<Tab>("friends");
@@ -89,6 +91,7 @@ export default function WorldFriendsOverlay({ fighters, onVisit, onClose }: {
   return <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/65 p-2 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="friends-title">
     <section className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border-2 border-[#765438] bg-[#efe2b8] text-[#2f3e2f] shadow-2xl">
       <header className="flex shrink-0 items-center justify-between gap-2 bg-[#d8b875] px-4 py-3"><h2 id="friends-title" className="text-lg font-bold">Friends / Neighborhood</h2><button type="button" onClick={onClose} className="rounded-lg bg-[#fff8dc] px-3 py-2 font-bold">Close</button></header>
+      {process.env.NEXT_PUBLIC_REALTIME_DEBUG === "1" && <RealtimeDebugPanel ownerId={presenceOwnerId} role={presenceRole} memberCount={presenceMemberCount} />}
       {!session ? <p className="p-5 text-sm">Open Sprout in Discord with a connected cloud session to use Neighborhood. Your local farm remains available.</p> : <>
         <nav className="flex shrink-0 gap-1 overflow-x-auto p-2" aria-label="Neighborhood sections">
           {(["friends", "requests", "search", "defense"] as Tab[]).map((value) => <button key={value} type="button" disabled={busy} onClick={() => { if (value !== tab && value === "defense") { setDefense(null); setSelectedIds([]); } setTab(value); setError(null); setMessage(null); }} aria-pressed={tab === value} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold ${tab === value ? "bg-[#fff8dc]" : "bg-[#d8b875]/50"}`}>{value === "defense" ? "Defense Team" : value === "requests" ? `Requests (${lists.incoming.length})` : value === "search" ? "Player Search" : "Friends"}</button>)}
@@ -131,4 +134,14 @@ export default function WorldFriendsOverlay({ fighters, onVisit, onClose }: {
       </>}
     </section>
   </div>;
+}
+
+function RealtimeDebugPanel({ ownerId, role, memberCount }: { ownerId: string | null; role: "owner" | "visitor"; memberCount: number }) {
+  const diagnostics = useSyncExternalStore(subscribeRealtimeDiagnostics, getRealtimeDiagnostics, getRealtimeDiagnostics);
+  const safeRoom = ownerId && /^\d{5,25}$/.test(ownerId) ? `farm:…${ownerId.slice(-4)}` : "none";
+  return <aside className="shrink-0 border-b border-[#765438]/30 bg-[#2b382d] px-3 py-2 text-xs text-[#f4e8c1]" aria-label="Realtime diagnostics">
+    <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Realtime: <strong>{diagnostics.stage}</strong></span><span>Room: {safeRoom}</span><span>Role: {role}</span><span>Members seen: {memberCount}</span></div>
+    <p className="mt-1 break-words text-[#d7e4cb]">Recent: {diagnostics.recent.join(" → ")}</p>
+    {diagnostics.error && <p className="mt-1 break-words text-[#ffd4b0]">Status: {diagnostics.error}</p>}
+  </aside>;
 }

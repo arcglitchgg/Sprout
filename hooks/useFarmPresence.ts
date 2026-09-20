@@ -55,6 +55,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         });
         channel.on("presence", { event: "join" }, () => realtimeStage("presence-join"));
         channel.on("presence", { event: "leave" }, () => realtimeStage("presence-leave"));
+        realtimeStage("channel-connecting");
         channel.subscribe((status, error) => {
           if (closed) return;
           if (status === "SUBSCRIBED") {
