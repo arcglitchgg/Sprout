@@ -15,6 +15,7 @@ import { FARM_OWNER_TILE, FIRST_WORLD } from "@/lib/world-data";
 import { findPath, findPathToAdjacent } from "@/lib/pathfinding";
 import { canModifyFarm } from "@/lib/social";
 import type { FriendFarmSnapshot, WorldContext, WorldPlayer } from "@/lib/social-types";
+import { useFarmPresence } from "@/hooks/useFarmPresence";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
 import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
@@ -69,7 +70,9 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const visiting = !canModifyFarm(context);
   const plots = context.mode === "visiting" ? context.snapshot.plots : ownPlots;
   const unlockedPlotCount = context.mode === "visiting" ? context.snapshot.unlockedPlotCount : ownUnlockedPlotCount;
-  const { user } = useDiscord();
+  const { user, session } = useDiscord();
+  const { ownerOnline, presentIds } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
+  const visitorCount = !visiting && user ? presentIds.filter((id) => id !== user.id).length : 0;
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: visiting ? FIRST_WORLD.start : initialFarmerTile, initialFacing: visiting ? "right" : initialFarmerFacing, onSettled: visiting ? undefined : onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
   const plotsRef = useRef(plots);
@@ -211,7 +214,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   }];
   if (context.mode === "visiting") players.push({
     userId: context.ownerId, displayName: context.snapshot.owner.displayName ?? context.snapshot.owner.username,
-    ...ownerPosition, facing: "left", isOwner: true, isLocal: false, online: false,
+    ...ownerPosition, facing: "left", isOwner: true, isLocal: false, online: ownerOnline,
   });
 
   function selectPlayer(player: WorldPlayer) {
@@ -238,6 +241,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
         <div>
           <h2 className="max-w-64 truncate text-base font-bold sm:text-lg">{context.mode === "visiting" ? `${context.snapshot.owner.displayName ?? context.snapshot.owner.username}'s farm · Lv ${context.snapshot.owner.farmLevel}` : "Sprout Valley"}</h2>
           <p className="hidden text-xs text-[#b9c1b9] sm:block">{visiting ? "Visiting · View-only. Walk around or talk to the farm owner." : "Click or tap to walk. Visit the shops, plots, Dungeon, or Friends exit."}</p>
+          {visitorCount > 0 && <p className="text-xs text-lime-300">{visitorCount} visitor{visitorCount === 1 ? "" : "s"} online</p>}
         </div>
         {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-3 py-2 text-xs font-bold text-[#4a2c12]">Return Home</button>}
         <div className="flex rounded-lg border border-white/15 bg-[#252d27] p-0.5" aria-label="Camera mode">
