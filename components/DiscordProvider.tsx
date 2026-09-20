@@ -10,9 +10,11 @@ export type DiscordRuntimeState = {
   ready: boolean;
   user: BasicDiscordUser | null;
   error: string | null;
+  session: string | null;
+  resolved: boolean;
 };
 
-const standaloneState: DiscordRuntimeState = { environment: "standalone", ready: false, user: null, error: null };
+const standaloneState: DiscordRuntimeState = { environment: "standalone", ready: false, user: null, error: null, session: null, resolved: false };
 export const DiscordContext = createContext<DiscordRuntimeState>(standaloneState);
 
 async function exchangeAuthorizationCode(code: string) {
@@ -25,36 +27,40 @@ async function exchangeAuthorizationCode(code: string) {
   if (!response.ok || typeof data !== "object" || data === null || !("access_token" in data) || typeof data.access_token !== "string") {
     throw new Error("Discord authorization code exchange failed.");
   }
-  return data.access_token;
+  return { accessToken: data.access_token, session: "session" in data && typeof data.session === "string" ? data.session : null };
 }
 
 export default function DiscordProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<DiscordRuntimeState>(standaloneState);
 
   useEffect(() => {
-    if (!isDiscordActivity(window.location.search)) return;
+    if (!isDiscordActivity(window.location.search)) {
+      queueMicrotask(() => setState({ ...standaloneState, resolved: true }));
+      return;
+    }
     let cancelled = false;
     const initialize = async () => {
       await Promise.resolve();
-      if (!cancelled) setState({ environment: "discord", ready: false, user: null, error: null });
+        if (!cancelled) setState({ environment: "discord", ready: false, user: null, error: null, session: null, resolved: false });
       const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
       if (!clientId) {
-        if (!cancelled) setState({ environment: "discord", ready: false, user: null, error: "NEXT_PUBLIC_DISCORD_CLIENT_ID is not configured." });
+        if (!cancelled) setState({ environment: "discord", ready: false, user: null, error: "NEXT_PUBLIC_DISCORD_CLIENT_ID is not configured.", session: null, resolved: true });
         return;
       }
       try {
         const sdk = new DiscordSDK(clientId);
+        let session: string | null = null;
         const user = await authenticateDiscordActivity({
           clientId,
           sdk,
-          exchangeCode: exchangeAuthorizationCode,
+          exchangeCode: async (code) => { const result = await exchangeAuthorizationCode(code); session = result.session; return result; },
           onReady: () => {
-            if (!cancelled) setState({ environment: "discord", ready: true, user: null, error: null });
+            if (!cancelled) setState({ environment: "discord", ready: true, user: null, error: null, session: null, resolved: false });
           },
         });
-        if (!cancelled) setState({ environment: "discord", ready: true, user, error: null });
+        if (!cancelled) setState({ environment: "discord", ready: true, user, error: null, session, resolved: true });
       } catch (error) {
-        if (!cancelled) setState((current) => ({ environment: "discord", ready: current.ready, user: null, error: error instanceof Error ? error.message : "Discord initialization failed." }));
+        if (!cancelled) setState((current) => ({ environment: "discord", ready: current.ready, user: null, error: error instanceof Error ? error.message : "Discord initialization failed.", session: null, resolved: true }));
       }
     };
     void initialize();

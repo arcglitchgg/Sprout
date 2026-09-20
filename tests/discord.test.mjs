@@ -57,3 +57,16 @@ test("authentication failures reject without producing identity", async () => {
   };
   await assert.rejects(() => authenticateDiscordActivity({ clientId: "client-1", sdk, exchangeCode: async () => "bad-token" }), /no user/i);
 });
+
+test("structured token exchange passes only the Discord access token to the SDK", async () => {
+  let received;
+  const sdk = {
+    ready: async () => {},
+    commands: {
+      authorize: async () => ({ code: "code-1" }),
+      authenticate: async (args) => { received = args; return { user: { id: "user-1", username: "sprout-player" } }; },
+    },
+  };
+  await authenticateDiscordActivity({ clientId: "client-1", sdk, exchangeCode: async () => ({ accessToken: "access-1", session: "sprout-session" }) });
+  assert.deepEqual(received, { access_token: "access-1" });
+});

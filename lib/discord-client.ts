@@ -7,6 +7,8 @@ export type BasicDiscordUser = {
   avatar: string | null;
 };
 
+export type DiscordExchange = { accessToken: string; session: string | null };
+
 type DiscordSdkLike = {
   ready: () => Promise<void>;
   commands: {
@@ -23,7 +25,7 @@ export function isDiscordActivity(search: string) {
 export async function authenticateDiscordActivity({ clientId, sdk, exchangeCode, onReady }: {
   clientId: string;
   sdk: DiscordSdkLike;
-  exchangeCode: (code: string) => Promise<string>;
+  exchangeCode: (code: string) => Promise<DiscordExchange | string>;
   onReady?: () => void;
 }): Promise<BasicDiscordUser> {
   await sdk.ready();
@@ -34,8 +36,8 @@ export async function authenticateDiscordActivity({ clientId, sdk, exchangeCode,
     prompt: "none",
     scope: ["identify"],
   });
-  const accessToken = await exchangeCode(code);
-  const auth = await sdk.commands.authenticate({ access_token: accessToken });
+  const exchange = await exchangeCode(code);
+  const auth = await sdk.commands.authenticate({ access_token: typeof exchange === "string" ? exchange : exchange.accessToken });
   if (!auth) throw new Error("Discord authentication returned no user.");
   return {
     id: auth.user.id,

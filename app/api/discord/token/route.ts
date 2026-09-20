@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { createSproutSession } from "@/lib/discord-session";
+import { upsertPlayerProfile } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -29,7 +31,27 @@ export async function POST(request: Request) {
     if (!response.ok || typeof token !== "object" || token === null || !("access_token" in token) || typeof token.access_token !== "string") {
       return NextResponse.json({ error: "Discord rejected the authorization code." }, { status: 502 });
     }
-    return NextResponse.json({ access_token: token.access_token }, { headers: { "Cache-Control": "no-store" } });
+    const identityResponse = await fetch("https://discord.com/api/v10/oauth2/@me", {
+      headers: { Authorization: `Bearer ${token.access_token}` }, cache: "no-store",
+    });
+    const identity: unknown = await identityResponse.json().catch(() => null);
+    if (!identityResponse.ok || !identity || typeof identity !== "object" || !("application" in identity) || !("user" in identity) || !("scopes" in identity)) {
+      return NextResponse.json({ error: "Discord identity verification failed." }, { status: 502 });
+    }
+    const app = identity.application;
+    const user = identity.user;
+    if (!app || typeof app !== "object" || !("id" in app) || app.id !== clientId || !Array.isArray(identity.scopes) || !identity.scopes.includes("identify") || !user || typeof user !== "object" || !("id" in user) || !("username" in user) || typeof user.id !== "string" || typeof user.username !== "string") {
+      return NextResponse.json({ error: "Discord identity verification failed." }, { status: 502 });
+    }
+    let session: string | null = null;
+    try {
+      session = createSproutSession(user.id);
+      await upsertPlayerProfile({ id: user.id, username: user.username, displayName: "global_name" in user && typeof user.global_name === "string" ? user.global_name : null, avatar: "avatar" in user && typeof user.avatar === "string" ? user.avatar : null });
+    } catch {
+      // Discord gameplay remains available if cloud storage has not been configured or is offline.
+      session = null;
+    }
+    return NextResponse.json({ access_token: token.access_token, session }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Discord token exchange is unavailable." }, { status: 502 });
   }

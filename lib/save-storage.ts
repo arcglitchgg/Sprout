@@ -4,6 +4,7 @@ import type { CropType, MutationType, PersonalityType, Plot } from "@/lib/game-t
 import type { SproutSaveV1, SproutSaveV2 } from "@/lib/save-types";
 
 export const SAVE_KEY = "sprout.save";
+export const discordSaveKey = (userId: string) => `sprout.save.${userId}`;
 export const CURRENT_SAVE_VERSION = 2;
 
 export type SaveLoadResult =
@@ -111,10 +112,10 @@ function developmentWarning(message: string, error?: unknown) {
   if (process.env.NODE_ENV !== "production") console.warn(message, error ?? "");
 }
 
-export function loadSproutSave(storage?: StorageLike): SaveLoadResult {
+export function loadSproutSave(storage?: StorageLike, key = SAVE_KEY): SaveLoadResult {
   const target = storage ?? (typeof window !== "undefined" ? window.localStorage : null);
   if (!target) return { status: "empty", save: null };
-  const raw = target.getItem(SAVE_KEY);
+  const raw = target.getItem(key);
   if (raw === null) return { status: "empty", save: null };
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -134,12 +135,12 @@ export function loadSproutSave(storage?: StorageLike): SaveLoadResult {
   }
 }
 
-export function writeSproutSave(save: SproutSaveV2, storage?: StorageLike) {
+export function writeSproutSave(save: SproutSaveV2, storage?: StorageLike, key = SAVE_KEY) {
   if (!validateSproutSave(save)) return false;
   const target = storage ?? (typeof window !== "undefined" ? window.localStorage : null);
   if (!target) return false;
   try {
-    target.setItem(SAVE_KEY, JSON.stringify(save));
+    target.setItem(key, JSON.stringify(save));
     return true;
   } catch (error) {
     developmentWarning("Sprout progress could not be saved.", error);
