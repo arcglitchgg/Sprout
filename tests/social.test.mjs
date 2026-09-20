@@ -124,14 +124,14 @@ test("visiting uses snapshot plots, blocks every farm mutation, and never persis
   let deferArrival = false;
   const stateUpdates = [];
   const uiMocks = {
-    react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, (value) => stateUpdates.push(value)], useRef: (value) => ({ current: value }), useEffect: () => {} },
+    react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, (value) => stateUpdates.push(value)], useRef: (value) => ({ current: value }), useEffect: () => {}, useMemo: (value) => value(), useCallback: (value) => value },
     "@/hooks/useDiscord": { useDiscord: () => ({ user: { id: "11111", username: "Alice" } }) },
     "@/hooks/useWorldMovement": { useWorldMovement: (_world, options) => {
       movementOptions = options;
       return { state: { tile: FIRST_WORLD.start, position: FIRST_WORLD.start, facing: "right", moving: false, frame: 0 }, moveTo: (_tile, onArrival) => { if (deferArrival) arrival = onArrival; else onArrival?.(); }, cancelInteraction: () => {} };
     } },
   };
-  for (const component of ["WorldMap", "WorldSeedShopPanel", "WorldDungeonOverlay", "WorldFarmhouseOverlay", "WorldMarketOverlay", "WorldFriendsOverlay", "WorldNotifications"]) uiMocks[`@/components/${component}`] = { default: component };
+  for (const component of ["WorldMap", "WorldSeedShopPanel", "WorldDungeonOverlay", "WorldFarmhouseOverlay", "WorldMarketOverlay", "WorldFriendsOverlay", "WorldNotifications", "RemotePlayersLayer"]) uiMocks[`@/components/${component}`] = { default: component };
   const uiLoad = loader(uiMocks);
   const PixelWorld = uiLoad("@/components/PixelWorld").default;
   const own = save();
@@ -162,8 +162,10 @@ test("visiting uses snapshot plots, blocks every farm mutation, and never persis
   assert.equal(homeMap.props.plots, own.game.plots);
   homeMap.props.onPlotClick(0);
   assert.equal(mutations, 1);
-  assert.equal(map.props.players.length, 2);
-  assert.equal(map.props.players.find((p) => p.isOwner).displayName, "Bob");
+  assert.equal(map.props.players.length, 1);
+  const remoteLayer = walkElements(visited, (e) => e.type === "RemotePlayersLayer")[0];
+  assert.equal(remoteLayer.props.ownerId, "22222");
+  assert.equal(remoteLayer.props.ownerName, "Bob");
   assert.equal(homeMap.props.players.length, 1);
   deferArrival = true;
   stateUpdates.length = 0;

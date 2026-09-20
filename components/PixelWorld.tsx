@@ -8,6 +8,7 @@ import WorldFarmhouseOverlay from "@/components/WorldFarmhouseOverlay";
 import WorldMarketOverlay from "@/components/WorldMarketOverlay";
 import WorldFriendsOverlay from "@/components/WorldFriendsOverlay";
 import WorldNotifications from "@/components/WorldNotifications";
+import RemotePlayersLayer from "@/components/RemotePlayersLayer";
 import type { WorldNotification } from "@/components/WorldNotifications";
 import { useWorldMovement } from "@/hooks/useWorldMovement";
 import { useDiscord } from "@/hooks/useDiscord";
@@ -71,7 +72,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const plots = context.mode === "visiting" ? context.snapshot.plots : ownPlots;
   const unlockedPlotCount = context.mode === "visiting" ? context.snapshot.unlockedPlotCount : ownUnlockedPlotCount;
   const { user, session } = useDiscord();
-  const { ownerOnline, presentIds } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
+  const { ownerOnline, presentIds, remoteStore, updateLocalMovement } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
   const visitorCount = !visiting && user ? presentIds.filter((id) => id !== user.id).length : 0;
   const { state, moveTo, cancelInteraction } = useWorldMovement(FIRST_WORLD, { initialTile: visiting ? FIRST_WORLD.start : initialFarmerTile, initialFacing: visiting ? "right" : initialFarmerFacing, onSettled: visiting ? undefined : onFarmerSettled });
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -208,14 +209,13 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const growingPlot = growingPlotId === null ? null : plots.find((plot) => plot.id === growingPlotId);
   const farmerWorldPosition = cellToWorld(FIRST_WORLD, state.position);
   const ownerPosition = cellToWorld(FIRST_WORLD, FARM_OWNER_TILE);
+  useEffect(() => {
+    updateLocalMovement({ ...cellToWorld(FIRST_WORLD, state.position), facing: state.facing, moving: state.moving });
+  }, [state.position, state.facing, state.moving, updateLocalMovement]);
   const players: WorldPlayer[] = [{
     userId: user?.id ?? "local", displayName: user?.globalName ?? user?.username ?? "Farmer", ...farmerWorldPosition,
     facing: state.facing, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame,
   }];
-  if (context.mode === "visiting") players.push({
-    userId: context.ownerId, displayName: context.snapshot.owner.displayName ?? context.snapshot.owner.username,
-    ...ownerPosition, facing: "left", isOwner: true, isLocal: false, online: ownerOnline,
-  });
 
   function selectPlayer(player: WorldPlayer) {
     if (modalOpen || !visiting || !player.isOwner || player.isLocal) return;
@@ -255,6 +255,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
           <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
+          <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
       </div>

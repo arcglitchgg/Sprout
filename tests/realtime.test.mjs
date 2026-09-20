@@ -106,16 +106,17 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
   const channels = [];
   const cleanups = [];
   const hook = loader({
-    react: { useState: () => [false, (value) => stateUpdates.push(value)], useEffect: (effect) => effects.push(effect) },
+    react: { useState: () => [false, (value) => stateUpdates.push(value)], useEffect: (effect) => effects.push(effect), useMemo: (factory) => factory(), useRef: (value) => ({ current: value }), useCallback: (callback) => callback },
     "@/lib/realtime-client": {
       requestRealtimeToken: async () => ({ token: "signed", expiresAt: Date.now() + 300000 }),
       createRealtimeClient: () => {
-        const record = { room: "", removed: false, untracked: false, payload: null, sync: null, status: null };
+        const record = { room: "", removed: false, untracked: false, payload: null, sync: null, status: null, sent: [] };
         channels.push(record);
         const channel = {
-          on: (_type, filter, callback) => { if (filter.event === "sync") record.sync = callback; return channel; },
+          on: (_type, filter, callback) => { if (filter.event === "sync") record.sync = callback; if (filter.event === "movement") record.movement = callback; return channel; },
           subscribe: (callback) => { record.status = callback; return channel; },
           track: async (payload) => { record.payload = payload; return "ok"; },
+          send: async (message) => { record.sent.push(message); return "ok"; },
           presenceState: () => record.state ?? {},
           untrack: async () => { record.untracked = true; },
         };
@@ -131,15 +132,29 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
   try {
     assert.equal(hook.farmRoom("11111"), "farm:11111");
     assert.throws(() => hook.farmRoom("other"));
-    hook.useFarmPresence("session", "11111", "11111");
+    const home = hook.useFarmPresence("session", "11111", "11111");
+    home.updateLocalMovement({ x: 500, y: 600, facing: "right", moving: false });
     const leaveHome = effects.pop()();
     cleanups.push(leaveHome);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(channels[0].room, "farm:11111");
     channels[0].status("SUBSCRIBED");
+    assert.equal(channels[0].sent.length, 1);
+    assert.equal(channels[0].sent[0].payload.userId, "11111");
+    assert.deepEqual(Object.keys(channels[0].sent[0].payload).sort(), ["facing", "moving", "seq", "timestamp", "userId", "x", "y"]);
+    home.updateLocalMovement({ x: 510, y: 600, facing: "right", moving: true });
+    home.updateLocalMovement({ x: 511, y: 600, facing: "right", moving: true });
+    assert.equal(channels[0].sent.length, 2, "start sends immediately; intermediate frames are throttled");
+    home.updateLocalMovement({ x: 520, y: 600, facing: "right", moving: false });
+    assert.equal(channels[0].sent.length, 3, "stop sends immediately");
+    channels[0].state = { "11111": [{ userId: "11111", isOwner: true }], "22222": [{ userId: "22222", isOwner: false }] };
+    channels[0].sync();
+    channels[0].movement({ payload: { userId: "22222", seq: 1, x: 700, y: 700, facing: "left", moving: true, timestamp: 1 } });
+    assert.equal(home.remoteStore.getSnapshot()[0].userId, "22222");
     assert.deepEqual(Object.keys(channels[0].payload).sort(), ["isOwner", "joinedAt", "userId"]);
     assert.equal(channels[0].payload.isOwner, true);
     leaveHome();
+    assert.equal(home.remoteStore.getSnapshot().length, 0);
     assert.equal(channels[0].untracked, true);
     assert.equal(channels[0].removed, true);
     hook.useFarmPresence("session", "11111", "22222");
@@ -208,5 +223,25 @@ test("repair migration completes an earlier function-only Presence setup", async
     assert.equal((await db.query("select count(*)::int as count from pg_policies where schemaname='realtime' and tablename='messages'")).rows[0].count, 2);
     await db.exec("insert into public.players(discord_user_id,username) values('11111','owner'),('22222','friend'); insert into public.friend_links(user_low,user_high,requested_by,status) values('11111','22222','11111','accepted');");
     assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','22222') as allowed")).rows[0].allowed, true);
+  } finally { await db.close(); }
+});
+
+test("movement Broadcast policies reuse farm membership without broadening Presence access", async () => {
+  const db = new PGlite({ extensions: { pg_trgm } });
+  try {
+    await db.exec("create schema extensions; create schema realtime; create role anon; create role authenticated; create role service_role bypassrls; create table realtime.messages(extension text, topic text); create function realtime.topic() returns text language sql stable as $$ select current_setting('sprout.test_topic', true) $$;");
+    for (const file of ["20260920_cloud_saves.sql", "20260921_social.sql", "20260922_farm_presence.sql", "20260924_farm_movement_broadcast.sql"]) {
+      await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+    }
+    await db.exec(readFileSync("supabase/migrations/20260924_farm_movement_broadcast.sql", "utf8"));
+    await db.exec("insert into public.players(discord_user_id,username) values('11111','owner'),('22222','friend'),('33333','stranger'); insert into public.friend_links(user_low,user_high,requested_by,status) values('11111','22222','11111','accepted');");
+    const policies = (await db.query("select policyname,cmd,roles,qual,with_check from pg_policies where schemaname='realtime' and tablename='messages' order by policyname")).rows;
+    assert.equal(policies.length, 4);
+    const broadcast = policies.filter((policy) => policy.policyname.startsWith("sprout_farm_movement_"));
+    assert.deepEqual(broadcast.map((policy) => policy.cmd).sort(), ["INSERT", "SELECT"]);
+    assert.ok(broadcast.every((policy) => JSON.stringify(policy).includes("broadcast") && JSON.stringify(policy).includes("can_join_sprout_farm") && policy.roles.includes("authenticated")));
+    assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','11111') as allowed")).rows[0].allowed, true);
+    assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','22222') as allowed")).rows[0].allowed, true);
+    assert.equal((await db.query("select public.can_join_sprout_farm('farm:11111','33333') as allowed")).rows[0].allowed, false);
   } finally { await db.close(); }
 });
