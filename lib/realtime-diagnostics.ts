@@ -28,7 +28,7 @@ export function realtimeStage(stage: string, detail?: string | number) {
   else if (stage === "session-unavailable") { next = "idle"; error = "No Sprout session is available."; }
   else if (stage === "presence-track-failed") { next = detail === "timed out" ? "timeout" : "channel-error"; error = detail === "timed out" ? "Presence tracking timed out." : "Presence tracking failed."; }
   else if (stage === "token-or-channel-rejected") { next = "channel-error"; error = "Token or room access was rejected."; }
-  else if (stage === "channel-error") { next = "channel-error"; error = "Realtime channel failed."; }
+  else if (stage === "channel-error") { next = "channel-error"; error = typeof detail === "string" ? detail : "Realtime channel failed."; }
   if (!next) return;
   snapshot = { stage: next, error, recent: [...snapshot.recent, next].slice(-8) };
   listeners.forEach((listener) => listener());
@@ -39,4 +39,18 @@ export function realtimeErrorKind(error: unknown) {
   if (/unauthori[sz]ed|invalid.*(jwt|token)|jwt.*(invalid|expired)|signature|token.*expired/i.test(message)) return "token-or-channel-rejected";
   if (/socket|websocket|network|connect|timeout|timed out/i.test(message)) return "socket-or-network-failed";
   return "channel-error";
+}
+
+// Only return known Realtime error categories; never display server text that may
+// contain a token, request header, key, or other unexpected value.
+export function safeRealtimeChannelError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/invalid.?jwt|invalid.*token|jwt.*(invalid|expired)|signature|token.*expired/i.test(message)) return "Supabase rejected the JWT (InvalidJWT).";
+  if (/privateonly|private.only/i.test(message)) return "Supabase requires a private channel (PrivateOnly).";
+  if (/unabletosetpolicies/i.test(message)) return "Supabase could not evaluate the channel policies (UnableToSetPolicies).";
+  if (/rls|row.level.security|policy|permission denied/i.test(message)) return "Supabase denied the channel policy.";
+  if (/unauthori[sz]ed/i.test(message)) return "Supabase denied channel access (Unauthorized).";
+  if (/realtimedisabledfortenant|realtime was disabled/i.test(message)) return "Supabase Realtime is disabled for this project.";
+  if (/timeout|timed out/i.test(message)) return "Supabase channel subscription timed out.";
+  return "Realtime channel failed (unrecognized server reason).";
 }

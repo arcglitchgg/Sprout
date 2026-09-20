@@ -75,6 +75,11 @@ test("diagnostics classify failures without including raw authentication materia
   assert.equal(diagnostics.realtimeErrorKind(new Error("Unauthorized access to Realtime channel")), "token-or-channel-rejected");
   assert.equal(diagnostics.realtimeErrorKind(new Error("WebSocket connection timed out")), "socket-or-network-failed");
   assert.equal(diagnostics.realtimeErrorKind(new Error("unrecognized failure")), "channel-error");
+  assert.equal(diagnostics.safeRealtimeChannelError(new Error("Unauthorized")), "Supabase denied channel access (Unauthorized).");
+  assert.equal(diagnostics.safeRealtimeChannelError(new Error("InvalidJWT")), "Supabase rejected the JWT (InvalidJWT).");
+  assert.equal(diagnostics.safeRealtimeChannelError(new Error("PrivateOnly")), "Supabase requires a private channel (PrivateOnly).");
+  assert.equal(diagnostics.safeRealtimeChannelError(new Error("UnableToSetPolicies")), "Supabase could not evaluate the channel policies (UnableToSetPolicies).");
+  assert.equal(diagnostics.safeRealtimeChannelError(new Error("secret-token-shaped-data")), "Realtime channel failed (unrecognized server reason).");
 });
 
 test("farm room lifecycle tracks only identity, leaves on switch/return, and marks owner online/offline", async () => {

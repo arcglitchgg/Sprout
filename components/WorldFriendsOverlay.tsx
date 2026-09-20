@@ -140,7 +140,7 @@ function RealtimeDebugPanel({ ownerId, role, memberCount }: { ownerId: string | 
   const diagnostics = useSyncExternalStore(subscribeRealtimeDiagnostics, getRealtimeDiagnostics, getRealtimeDiagnostics);
   const safeRoom = ownerId && /^\d{5,25}$/.test(ownerId) ? `farm:…${ownerId.slice(-4)}` : "none";
   return <aside className="shrink-0 border-b border-[#765438]/30 bg-[#2b382d] px-3 py-2 text-xs text-[#f4e8c1]" aria-label="Realtime diagnostics">
-    <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Realtime: <strong>{diagnostics.stage}</strong></span><span>Room: {safeRoom}</span><span>Role: {role}</span><span>Members seen: {memberCount}</span></div>
+    <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Realtime Debug — <strong>{diagnostics.stage}</strong></span><span>Room: {safeRoom}</span><span>Role: {role}</span><span>Members seen: {memberCount}</span></div>
     <p className="mt-1 break-words text-[#d7e4cb]">Recent: {diagnostics.recent.join(" → ")}</p>
     {diagnostics.error && <p className="mt-1 break-words text-[#ffd4b0]">Status: {diagnostics.error}</p>}
   </aside>;
