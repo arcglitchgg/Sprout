@@ -1,6 +1,6 @@
 import { FIRST_WORLD } from "@/lib/world-data";
 import { TOTAL_FARM_PLOTS } from "@/lib/progression";
-import type { CropType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
+import type { CropType, HarvestMutationType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
 import type { SproutSaveV1, SproutSaveV2 } from "@/lib/save-types";
 
 export const SAVE_KEY = "sprout.save";
@@ -13,14 +13,18 @@ export type SaveLoadResult =
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const crops: CropType[] = ["potato", "carrot", "corn"];
-const mutations: MutationType[] = ["normal", "large", "golden", "prismatic"];
+const harvestMutations: HarvestMutationType[] = ["normal", "large", "golden", "prismatic"];
+const fighterMutations: MutationType[] = [...harvestMutations, "ascended"];
 const personalities: PersonalityType[] = ["angry", "protective", "lazy", "clever", "mean"];
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isFiniteNonnegative = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
 const isId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 const isCrop = (value: unknown): value is CropType => crops.includes(value as CropType);
-const isMutation = (value: unknown): value is MutationType => mutations.includes(value as MutationType);
+const isHarvestMutation = (value: unknown): value is HarvestMutationType => harvestMutations.includes(value as HarvestMutationType);
+const isFighterMutation = (value: unknown): value is MutationType => fighterMutations.includes(value as MutationType);
 const isPersonality = (value: unknown): value is PersonalityType => personalities.includes(value as PersonalityType);
+const validAscensionPity = (value: unknown) => isRecord(value) && crops.every((crop) =>
+  Number.isInteger(value[crop]) && (value[crop] as number) >= 0 && (value[crop] as number) < 3);
 
 function validFarmerTile(value: unknown) {
   if (!isRecord(value) || !Number.isInteger(value.x) || !Number.isInteger(value.y)) return false;
@@ -47,6 +51,7 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   const game = value.game;
   if (!isFiniteNonnegative(game.coins) || !isCrop(game.selectedCrop) || !isRecord(game.seeds)) return false;
   if (requireFarmXp && !isFiniteNonnegative(game.farmXp)) return false;
+  if (requireFarmXp && game.ascensionPity !== undefined && !validAscensionPity(game.ascensionPity)) return false;
   const seeds = game.seeds;
   if (!crops.every((crop) => Number.isInteger(seeds[crop]) && (seeds[crop] as number) >= 0)) return false;
   if (!validPlots(game.plots, plotCount)) return false;
@@ -54,15 +59,15 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   if (!Array.isArray(game.harvestedCrops)) return false;
   const harvestedIds = new Set<string>();
   for (const item of game.harvestedCrops) {
-    if (!isRecord(item) || !isId(item.id) || harvestedIds.has(item.id) || !isCrop(item.crop) || !isMutation(item.mutation) || !isFiniteNonnegative(item.baseSellValue) || !isFiniteNonnegative(item.sellValue) || !isFiniteNonnegative(item.harvestedAt)) return false;
+    if (!isRecord(item) || !isId(item.id) || harvestedIds.has(item.id) || !isCrop(item.crop) || !isHarvestMutation(item.mutation) || !isFiniteNonnegative(item.baseSellValue) || !isFiniteNonnegative(item.sellValue) || !isFiniteNonnegative(item.harvestedAt)) return false;
     harvestedIds.add(item.id);
   }
 
-  if (!Array.isArray(game.collection) || !game.collection.every((entry) => isRecord(entry) && isCrop(entry.crop) && isMutation(entry.mutation))) return false;
+  if (!Array.isArray(game.collection) || !game.collection.every((entry) => isRecord(entry) && isCrop(entry.crop) && isHarvestMutation(entry.mutation))) return false;
   if (!Array.isArray(game.fighters)) return false;
   const fighterIds = new Set<string>();
   for (const fighter of game.fighters) {
-    if (!isRecord(fighter) || !isId(fighter.id) || fighterIds.has(fighter.id) || !isCrop(fighter.crop) || !isMutation(fighter.mutation) || !isPersonality(fighter.personality)) return false;
+    if (!isRecord(fighter) || !isId(fighter.id) || fighterIds.has(fighter.id) || !isCrop(fighter.crop) || !isFighterMutation(fighter.mutation) || !isPersonality(fighter.personality)) return false;
     if (![fighter.hp, fighter.attack, fighter.defense, fighter.speed].every(isFiniteNonnegative)) return false;
     fighterIds.add(fighter.id);
   }

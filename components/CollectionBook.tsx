@@ -1,8 +1,8 @@
-import { crops, mutations } from "@/lib/game-data";
-import type { CollectionEntry, CropType, MutationType } from "@/lib/game-types";
+import { crops, HARVEST_MUTATIONS, mutations } from "@/lib/game-data";
+import type { CollectionEntry, CropType } from "@/lib/game-types";
 
 export default function CollectionBook({ collection }: { collection: CollectionEntry[] }) {
-  const totalPossibleDiscoveries = Object.keys(crops).length * Object.keys(mutations).length;
+  const totalPossibleDiscoveries = Object.keys(crops).length * HARVEST_MUTATIONS.length;
   return (
     <section className="mt-6 rounded-2xl bg-[#f4e8c1] p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -29,11 +29,7 @@ export default function CollectionBook({ collection }: { collection: CollectionE
               </div>
 
               <div className="space-y-1 text-xs">
-                {(
-                  Object.keys(
-                    mutations
-                  ) as MutationType[]
-                ).map((mutationKey) => {
+                {HARVEST_MUTATIONS.map((mutationKey) => {
                   const discovered =
                     collection.some(
                       (entry) =>

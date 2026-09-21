@@ -27,9 +27,9 @@ Plant → harvest mutated crops
 - Farm Level uses account-wide Farm XP and unlocks plots. It is distinct from the proposed per-fighter XP and levels.
 - Dungeon battles currently award 20 coins and 15 Farm XP on a once-only victory boundary. Fighters do **not** earn XP or levels.
 - Each current species has Basic Attack and one weighted auto-cast skill. Personalities influence choices and targeting. Skills are available immediately; level-based unlocks do not exist.
-- Fusion currently accepts four fighters of one species and one tier. Four Normal yield 70% Normal / 30% Large; four Large yield Large. Golden and Prismatic fusion are disabled. Fusion grants no Farm XP.
+- Fusion accepts four fighters of one species and one tier. Four Normal yield 70% Normal / 30% Large; four Large have a 30% Golden chance; four Golden have a 25% Prismatic chance; four Prismatic have a 35% Ascended chance with a guaranteed result on that species' third attempt. Failures return the input tier. Ascended cannot fuse further. Fusion grants no Farm XP.
 - PvP uses stored fighter snapshots and seeded battle resolution. A server-finalized winner receives one persistent PvP Win; PvP grants no coins, Farm XP, or fighter XP. There is no PvP rank or season system.
-- Save V2 stores existing farm and fighter state. Fighter progression and a fifth mutation tier will require a future schema migration, likely Save V3.
+- Save V2 stores farm and fighter state plus optional per-species Ascension pity counters. Old V2 saves load with zero pity. Fighter XP and levels remain a future migration concern, likely Save V3.
 
 ## Coin economy and awakening
 
@@ -48,20 +48,20 @@ The Farmhouse should show the cost before confirmation. If coins are insufficien
 
 Playtests produced multiple Prismatic crops and fighters within roughly a day. Prismatic should stay exciting, but it is not the final endgame tier. Do not sharply reduce its harvest odds solely to add grind. Add a highest fighter rarity with the working name **Ascended**; the final name is open.
 
-Ascended cannot be harvested directly. The intended recipe is **four awakened Prismatic fighters of the same species → one guaranteed Ascended fighter**. There is no extra success roll: the four inputs already require rare harvests, awakening coins, and duplicate collection. Harvested crops cannot be used directly as fusion inputs.
+Ascended cannot be harvested directly. Four awakened Prismatic fighters of the same species fuse with a **35% Ascended chance**; the third attempt for that species is guaranteed if the first two failed. Failure returns one Prismatic fighter. Pity is independent for Potato, Carrot, and Corn and resets on success. Harvested crops cannot be used directly as fusion inputs.
 
 Long-term tier path:
 
 | Inputs, same species and tier | Intended result |
 | --- | --- |
 | 4 Normal | Chance to upgrade to Large; current 70% Normal / 30% Large |
-| 4 Large | Chance to upgrade to Golden; probability undecided (currently always Large) |
-| 4 Golden | Chance to upgrade to Prismatic; probability undecided (currently disabled) |
-| 4 Prismatic | Guaranteed Ascended (currently disabled) |
+| 4 Large | 30% Golden; otherwise Large |
+| 4 Golden | 25% Prismatic; otherwise Golden |
+| 4 Prismatic | 35% Ascended; otherwise Prismatic; guaranteed on the species' third attempt |
 
-Do not set Large→Golden or Golden→Prismatic odds yet. Evaluate pity or bad-luck protection for repeated lower-tier failures during playtesting. Avoid stacking excessive RNG on top of rare inputs; high-rarity fusion should feel earned, not punitive.
+These are initial balance values. Evaluate bad-luck protection for repeated lower-tier failures during playtesting. Avoid stacking excessive RNG on top of rare inputs; the Ascended hard pity limits the highest-tier streak.
 
-Ascended should offer aspiration without invalidating lower tiers or guaranteeing a PvP win. Explore distinctive art, aura/frame/nameplate, battle effect, and possibly a signature skill. A roughly **10–20% stat improvement over Prismatic is only a range to evaluate**, not a locked multiplier. Team composition, personality, skill choice, and training must remain relevant.
+Ascended should offer aspiration without invalidating lower tiers or guaranteeing a PvP win. Its initial fighter stat multiplier is **15% above Prismatic** and remains adjustable. Distinctive art, aura/frame/nameplate, battle effects, and a possible signature skill are future ideas, not current mechanics. Team composition, personality, and skill choice must remain relevant.
 
 ## Fighter development and Dungeon
 
@@ -75,7 +75,7 @@ PvP should initially give no fighter XP, or very little if testing later support
 
 - Farming stays useful at every progression stage; combat progression must not obsolete it.
 - PvP provides status and competition, not an easier route to coins, crops, or fighter training.
-- Do not stack punishing RNG on rare materials. In particular, four Prismatic inputs guarantee Ascended.
+- Do not stack punishing RNG on rare materials. In particular, the third same-species Prismatic fusion guarantees Ascended.
 - New rarity tiers should add aspiration without erasing value in previously trained fighters.
 - Coin sinks should create decisions while leaving room to experiment with teams.
 - Keep the first expansion small; tune costs, odds, level curves, and stat advantage from playtests.
@@ -83,10 +83,10 @@ PvP should initially give no fighter XP, or very little if testing later support
 ## Implementation order and migration notes
 
 1. Add awakening cost display and an atomic affordability/creation transaction, with tests for insufficient coins, item retention, and no duplicate charge.
-2. Design Save V3 for fighter XP/level and Ascended data. Migrate V2 fighters to a defensible starting level without reconstructing historical Dungeon participation. Update validation, cloud-save handling, and combat snapshot compatibility together.
+2. Design Save V3 for fighter XP/level. Migrate V2 fighters to a defensible starting level without reconstructing historical Dungeon participation. Update validation, cloud-save handling, and combat snapshot compatibility together.
 3. Add per-fighter Dungeon XP and a small level curve with once-only battle rewards. Keep Farm XP separate and make participant attribution explicit.
 4. Gate the existing skill by level only when level progression is ready, then add a small set of species skills. Preserve weighted selection and personality behavior.
-5. Extend fusion validation and generation tier by tier. Decide Large→Golden and Golden→Prismatic odds through playtests; add guaranteed four-Prismatic Ascended fusion.
+5. Playtest the implemented fusion odds and Ascension pity; adjust centralized probabilities only with balance evidence.
 6. Balance Ascended stats and visuals against PvP, Combat Power, and lower-rarity trained teams. Verify old and new fighter snapshots remain replayable before changing live battle rules.
 
 These changes will touch fighter types and generation, fusion, Farmhouse UI, persistence and cloud validation, battle balancing, and PvP Combat Power. Treat each as a staged change; do not infer new mechanics from this document alone.

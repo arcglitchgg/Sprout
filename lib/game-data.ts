@@ -1,4 +1,9 @@
-import type { CropType, CropDefinition, MutationType, MutationDefinition, PersonalityType } from "@/lib/game-types";
+import type { CropType, CropDefinition, HarvestMutationType, MutationType, MutationDefinition, PersonalityType } from "@/lib/game-types";
+
+export const HARVEST_MUTATIONS: HarvestMutationType[] = ["normal", "large", "golden", "prismatic"];
+export const FIGHTER_RARITY_MULTIPLIERS: Record<MutationType, number> = {
+  normal: 1, large: 1.1, golden: 1.25, prismatic: 1.5, ascended: 1.5 * 1.15,
+};
 
 export const crops: Record<CropType, CropDefinition> = {
   potato: {
@@ -49,6 +54,12 @@ export const mutations: Record<MutationType, MutationDefinition> = {
     chance: 1,
     label: "🌈",
   },
+  ascended: {
+    name: "Ascended",
+    multiplier: 10,
+    chance: 0,
+    label: "✦",
+  },
 };
 
 export const personalities: Record<
@@ -85,4 +96,3 @@ export const personalities: Record<
     description: "+15% damage to weakened enemies",
   },
 };
-

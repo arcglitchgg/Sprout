@@ -1,7 +1,7 @@
 import { crops, mutations } from "@/lib/game-data";
-import type { CropType, MutationType, Plot } from "@/lib/game-types";
+import type { CropType, HarvestMutationType, Plot } from "@/lib/game-types";
 
-export function rollMutation(): MutationType {
+export function rollMutation(): HarvestMutationType {
   const roll = Math.random() * 100;
 
   if (roll < mutations.prismatic.chance) {
@@ -43,6 +43,6 @@ export function isReady(plot: Plot, now: number) {
 }
 
 
-export function getHarvestValue(crop: CropType, mutation: MutationType) {
+export function getHarvestValue(crop: CropType, mutation: HarvestMutationType) {
   return Math.round(crops[crop].sellPrice * mutations[mutation].multiplier);
 }

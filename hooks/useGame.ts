@@ -6,11 +6,11 @@ import type { BattleState } from "@/lib/battle-types";
 import { crops } from "@/lib/game-data";
 import { isReady, rollMutation } from "@/lib/farming";
 import { generateFighter } from "@/lib/fighters";
-import { fuseFighters as createFusion } from "@/lib/fusion";
+import { fuseFighters as createFusion, INITIAL_ASCENSION_PITY } from "@/lib/fusion";
 import { harvestPlot, harvestReadyPlots, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { claimBattleVictoryReward, FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
-import type { CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
+import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
 import type { SproutGameSaveV2 } from "@/lib/save-types";
 import type { WorldNotification } from "@/components/WorldNotifications";
 
@@ -27,6 +27,7 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   const [collection, setCollection] = useState<CollectionEntry[]>(() => initial ? initial.collection.map((entry) => ({ ...entry })) : []);
   const [harvestedCrops, setHarvestedCrops] = useState<HarvestedCrop[]>(() => initial ? initial.harvestedCrops.map((item) => ({ ...item })) : []);
   const [fighters, setFighters] = useState<Fighter[]>(() => initial ? initial.fighters.map((fighter) => ({ ...fighter })) : []);
+  const [ascensionPity, setAscensionPity] = useState<AscensionPity>(() => ({ ...INITIAL_ASCENSION_PITY, ...initial?.ascensionPity }));
   const coinsRef = useRef(coins);
   const farmXpRef = useRef(farmXp);
   const plotsRef = useRef(plots);
@@ -34,6 +35,7 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   const harvestedCropsRef = useRef(harvestedCrops);
   const collectionRef = useRef(collection);
   const fightersRef = useRef(fighters);
+  const ascensionPityRef = useRef(ascensionPity);
 
   const farmLevel = getFarmLevel(farmXp);
   const unlockedPlotCount = getUnlockedPlotCount(farmXp);
@@ -183,12 +185,14 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   }
 
   function fuseFighters(selectedIds: string[]) {
-    const fusion = createFusion(fightersRef.current, selectedIds);
+    const fusion = createFusion(fightersRef.current, selectedIds, Math.random, ascensionPityRef.current);
     if (!fusion) return null;
     fightersRef.current = fusion.remaining;
+    ascensionPityRef.current = fusion.pity;
     setFighters(fusion.remaining);
+    setAscensionPity(fusion.pity);
     return fusion.result;
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, awardBattleVictory };
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, awardBattleVictory };
 }

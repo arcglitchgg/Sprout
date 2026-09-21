@@ -4,15 +4,18 @@ import { useState } from "react";
 import CollectionBook from "@/components/CollectionBook";
 import FighterCard from "@/components/FighterCard";
 import HarvestedCropCard from "@/components/HarvestedCropCard";
-import { getFusionEligibility } from "@/lib/fusion";
+import { ASCENSION_HARD_PITY, FUSION_UPGRADE_CHANCE, getFusionEligibility } from "@/lib/fusion";
 import { crops, mutations } from "@/lib/game-data";
-import type { CollectionEntry, Fighter, HarvestedCrop } from "@/lib/game-types";
+import type { AscensionPity, CollectionEntry, Fighter, HarvestedCrop, HarvestMutationType } from "@/lib/game-types";
+
+const nextTier: Record<HarvestMutationType, string> = { normal: "Large", large: "Golden", golden: "Prismatic", prismatic: "Ascended" };
 
 type FarmhouseTab = "collection" | "fighters" | "harvested crops" | "fusion";
 
 export default function WorldFarmhouseOverlay({
   collection,
   fighters,
+  ascensionPity,
   harvestedCrops,
   awakenCrop,
   fuseFighters,
@@ -20,6 +23,7 @@ export default function WorldFarmhouseOverlay({
 }: {
   collection: CollectionEntry[];
   fighters: Fighter[];
+  ascensionPity: AscensionPity;
   harvestedCrops: HarvestedCrop[];
   awakenCrop: (itemId: string) => void;
   fuseFighters: (selectedIds: string[]) => Fighter | null;
@@ -105,22 +109,22 @@ export default function WorldFarmhouseOverlay({
                   <strong>Selected: {selected.length} / 4</strong>
                   <button type="button" onClick={() => setSelectedIds([])} disabled={selected.length === 0} className="rounded-lg border border-[#765438]/40 px-3 py-1 font-bold disabled:opacity-40">Clear</button>
                 </div>
-                <p className="mt-1">Choose four fighters of the same species and mutation. Golden and Prismatic cannot be fused yet.</p>
+                <p className="mt-1">Choose four fighters of the same species and rarity. Ascended cannot be fused further.</p>
                 {firstSelected && <p className="mt-2 font-bold">Species: {crops[firstSelected.crop].name} · Tier: {mutations[firstSelected.mutation].name}</p>}
-                {firstSelected && (firstSelected.mutation === "normal" || firstSelected.mutation === "large") && (
-                  <p className="mt-1 font-bold">Fusion Result: {firstSelected.mutation === "normal" ? "70% Normal · 30% Large" : "100% Large"}</p>
-                )}
+                {firstSelected && firstSelected.mutation !== "ascended" && <p className="mt-1 font-bold">Fusion Result: {firstSelected.mutation === "prismatic" && ascensionPity[firstSelected.crop] >= ASCENSION_HARD_PITY - 1
+                  ? "100% Ascended" : `${Math.round((1 - FUSION_UPGRADE_CHANCE[firstSelected.mutation]) * 100)}% ${mutations[firstSelected.mutation].name} · ${Math.round(FUSION_UPGRADE_CHANCE[firstSelected.mutation] * 100)}% ${nextTier[firstSelected.mutation]}`}</p>}
+                {firstSelected?.mutation === "prismatic" && <p className="mt-1 font-bold">Ascension: {ascensionPity[firstSelected.crop] + 1} / {ASCENSION_HARD_PITY}{ascensionPity[firstSelected.crop] >= ASCENSION_HARD_PITY - 1 ? " · Next Ascension guaranteed" : ""}</p>}
                 <p className="mt-2 text-[#7b3e20]" role="status">{eligibility.valid ? "Ready to fuse four fighters." : eligibility.reason}</p>
                 <button type="button" onClick={performFusion} disabled={!eligibility.valid} className="mt-3 w-full rounded-lg bg-[#4f772d] px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Fuse Fighters</button>
               </div>
               {fighters.length === 0 ? <p className="rounded-xl bg-[#fff8dc] p-4 text-sm">Awaken fighters to use Fusion.</p> : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {fighters.map((fighter) => {
-                    const unavailable = fighter.mutation === "golden" || fighter.mutation === "prismatic";
+                    const unavailable = fighter.mutation === "ascended";
                     const chosen = selected.includes(fighter.id);
                     return <button key={fighter.id} type="button" onClick={() => toggleFighter(fighter.id)} disabled={unavailable || (!chosen && selected.length === 4)} aria-pressed={chosen} className={`rounded-xl border-2 text-left disabled:cursor-not-allowed ${chosen ? "border-[#4f772d] bg-[#d9ed92]" : "border-transparent"} ${unavailable ? "opacity-55" : "hover:border-[#4f772d]/60"}`}>
                       <FighterCard fighter={fighter} />
-                      <span className="block px-3 pb-2 text-xs font-bold">{unavailable ? "Fusion unavailable in V1" : chosen ? "✓ Selected" : "Select fighter"}</span>
+                      <span className="block px-3 pb-2 text-xs font-bold">{unavailable ? "Ascended cannot fuse further" : chosen ? "✓ Selected" : "Select fighter"}</span>
                     </button>;
                   })}
                 </div>

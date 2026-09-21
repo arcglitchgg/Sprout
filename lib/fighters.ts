@@ -1,4 +1,4 @@
-import { personalities } from "@/lib/game-data";
+import { FIGHTER_RARITY_MULTIPLIERS, personalities } from "@/lib/game-data";
 import type { CropType, Fighter, MutationType, PersonalityType } from "@/lib/game-types";
 
 export function generateFighter(source: { crop: CropType; mutation: MutationType }, random: () => number = Math.random): Fighter {
@@ -32,14 +32,7 @@ export function generateFighter(source: { crop: CropType; mutation: MutationType
   }
 
   // Mutation strength
-  const mutationMultiplier =
-    source.mutation === "normal"
-      ? 1
-      : source.mutation === "large"
-        ? 1.1
-        : source.mutation === "golden"
-          ? 1.25
-          : 1.5;
+  const mutationMultiplier = FIGHTER_RARITY_MULTIPLIERS[source.mutation];
 
   hp = Math.round(hp * mutationMultiplier);
   attack = Math.round(attack * mutationMultiplier);

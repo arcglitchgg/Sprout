@@ -97,6 +97,20 @@ test("all 144 V2 plots survive save and load", () => {
   assert.deepEqual(loaded.game.plots[100], save.game.plots[100]);
 });
 
+test("optional per-species Ascension pity round-trips in V2 and rejects corrupt counters", () => {
+  const save = validSave();
+  save.game.ascensionPity = { potato: 2, carrot: 1, corn: 0 };
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  assert.deepEqual(loadSproutSave(storage).save.game.ascensionPity, save.game.ascensionPity);
+  save.game.ascensionPity.potato = 3;
+  assert.equal(validateSproutSave(save), false);
+  save.game.ascensionPity.potato = -1;
+  assert.equal(validateSproutSave(save), false);
+  delete save.game.ascensionPity;
+  assert.equal(validateSproutSave(save), true, "old V2 saves remain valid");
+});
+
 test("corrupted structures fall back without partial hydration", () => {
   const corrupted = validSave();
   corrupted.game.plots.pop();

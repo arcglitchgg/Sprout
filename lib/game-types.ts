@@ -2,7 +2,9 @@ export type CropType = "potato" | "carrot" | "corn";
 
 export type SeedInventory = Record<CropType, number>;
 
-export type MutationType = "normal" | "large" | "golden" | "prismatic";
+export type HarvestMutationType = "normal" | "large" | "golden" | "prismatic";
+export type MutationType = HarvestMutationType | "ascended";
+export type AscensionPity = Record<CropType, number>;
 
 export type PersonalityType =
   | "angry"
@@ -34,7 +36,7 @@ export type Plot = {
 
 export type CollectionEntry = {
   crop: CropType;
-  mutation: MutationType;
+  mutation: HarvestMutationType;
 };
 
 export type Fighter = {
@@ -51,7 +53,7 @@ export type Fighter = {
 export type HarvestedCrop = {
   id: string;
   crop: CropType;
-  mutation: MutationType;
+  mutation: HarvestMutationType;
   baseSellValue: number;
   sellValue: number;
   harvestedAt: number;

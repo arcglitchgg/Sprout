@@ -1,10 +1,10 @@
 import { crops } from "@/lib/game-data";
 import { getHarvestValue, isReady } from "@/lib/farming";
-import type { CropType, HarvestedCrop, MutationType, Plot } from "@/lib/game-types";
+import type { CropType, HarvestedCrop, HarvestMutationType, Plot } from "@/lib/game-types";
 
 export function createHarvestedCrop(
   crop: CropType,
-  mutation: MutationType,
+  mutation: HarvestMutationType,
   harvestedAt: number,
   id = crypto.randomUUID(),
 ): HarvestedCrop {
@@ -51,7 +51,7 @@ export function harvestPlot(
   plots: Plot[],
   items: HarvestedCrop[],
   plotId: number,
-  mutation: MutationType,
+  mutation: HarvestMutationType,
   harvestedAt: number,
   itemId?: string,
 ) {
@@ -69,7 +69,7 @@ export function harvestPlot(
 /** Apply all eligible harvests to one snapshot; each crop gets its own roll and item. */
 export function harvestReadyPlots(
   plots: Plot[], items: HarvestedCrop[], unlockedPlotCount: number, harvestedAt: number,
-  roll: () => MutationType,
+  roll: () => HarvestMutationType,
   createId: () => string = () => crypto.randomUUID(),
 ) {
   const harvested: HarvestedCrop[] = [];
