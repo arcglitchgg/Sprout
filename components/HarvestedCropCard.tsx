@@ -1,9 +1,11 @@
 import { crops, mutations } from "@/lib/game-data";
 import type { HarvestedCrop } from "@/lib/game-types";
 
-export default function HarvestedCropCard({ item, actionLabel, onAction, selected = false, onSelect }: {
+export default function HarvestedCropCard({ item, actionLabel, actionDetail, actionDisabled = false, onAction, selected = false, onSelect }: {
   item: HarvestedCrop;
   actionLabel?: string;
+  actionDetail?: string;
+  actionDisabled?: boolean;
   onAction?: (itemId: string) => void;
   selected?: boolean;
   onSelect?: (itemId: string) => void;
@@ -32,9 +34,12 @@ export default function HarvestedCropCard({ item, actionLabel, onAction, selecte
         <p className="text-xs text-[#65451f]">Sell value: <strong>🪙 {item.sellValue}</strong></p>
       </div>
       {actionLabel && onAction && (
-        <button type="button" onClick={() => onAction(item.id)} className="shrink-0 rounded-lg bg-[#4f772d] px-3 py-2 text-xs font-bold text-white hover:bg-[#3e6421] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4f772d]">
-          {actionLabel}
-        </button>
+        <div className="shrink-0 text-right">
+          {actionDetail && <span className="mb-1 block text-[11px] font-bold text-[#65451f]">{actionDetail}</span>}
+          <button type="button" onClick={() => onAction(item.id)} disabled={actionDisabled} className="rounded-lg bg-[#4f772d] px-3 py-2 text-xs font-bold text-white hover:bg-[#3e6421] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4f772d]">
+            {actionLabel}
+          </button>
+        </div>
       )}
     </article>
   );

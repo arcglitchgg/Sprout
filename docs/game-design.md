@@ -23,7 +23,7 @@ Plant → harvest mutated crops
 
 ## Current state (September 2026)
 
-- Harvested crops enter an individual-item inventory. The Market sells them; the Farmhouse awakens them. Awakening currently has **no coin cost**.
+- Harvested crops enter an individual-item inventory. The Market sells them; the Farmhouse awakens them for a rarity-based coin cost.
 - Farm Level uses account-wide Farm XP and unlocks plots. It is distinct from the proposed per-fighter XP and levels.
 - Dungeon battles currently award 20 coins and 15 Farm XP on a once-only victory boundary. Fighters do **not** earn XP or levels.
 - Each current species has Basic Attack and one weighted auto-cast skill. Personalities influence choices and targeting. Skills are available immediately; level-based unlocks do not exist.

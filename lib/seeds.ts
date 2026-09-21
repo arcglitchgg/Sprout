@@ -7,13 +7,16 @@ export const INITIAL_SEEDS: SeedInventory = {
   corn: 0,
 };
 
-export function purchaseSeed(seeds: SeedInventory, coins: number, crop: CropType) {
-  const price = crops[crop].cost;
-  if (coins < price) return { purchased: false, seeds, coins };
+export function purchaseSeed(seeds: SeedInventory, coins: number, crop: CropType, quantity = 1) {
+  if (!Number.isSafeInteger(quantity) || quantity <= 0) return { purchased: false, seeds, coins, quantity: 0, totalPrice: 0 };
+  const totalPrice = crops[crop].cost * quantity;
+  if (coins < totalPrice) return { purchased: false, seeds, coins, quantity, totalPrice };
   return {
     purchased: true,
-    seeds: { ...seeds, [crop]: seeds[crop] + 1 },
-    coins: coins - price,
+    seeds: { ...seeds, [crop]: seeds[crop] + quantity },
+    coins: coins - totalPrice,
+    quantity,
+    totalPrice,
   };
 }
 

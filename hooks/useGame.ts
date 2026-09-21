@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VICTORY_COINS } from "@/lib/battle-data";
+import { awakenHarvestedCrop } from "@/lib/awakening";
 import type { BattleState } from "@/lib/battle-types";
 import { crops } from "@/lib/game-data";
 import { isReady, rollMutation } from "@/lib/farming";
-import { generateFighter } from "@/lib/fighters";
 import { fuseFighters as createFusion, INITIAL_ASCENSION_PITY } from "@/lib/fusion";
-import { harvestPlot, harvestReadyPlots, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
+import { harvestPlot, harvestReadyPlots, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { claimBattleVictoryReward, FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
 import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
@@ -92,8 +92,8 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
     return null;
   }
 
-  function buySeed(crop: CropType) {
-    const result = purchaseSeed(seedsRef.current, coinsRef.current, crop);
+  function buySeed(crop: CropType, quantity = 1) {
+    const result = purchaseSeed(seedsRef.current, coinsRef.current, crop, quantity);
     if (!result.purchased) return;
     coinsRef.current = result.coins;
     seedsRef.current = result.seeds;
@@ -174,14 +174,19 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   }
 
   function awakenCrop(itemId: string) {
-    const result = removeHarvestedCrop(harvestedCropsRef.current, itemId);
-    if (!result.item) return;
-    const fighter = generateFighter(result.item);
-    harvestedCropsRef.current = result.remaining;
-    fightersRef.current = [...fightersRef.current, fighter];
-    setFighters(fightersRef.current);
-    setHarvestedCrops(result.remaining);
+    const result = awakenHarvestedCrop(harvestedCropsRef.current, fightersRef.current, coinsRef.current, itemId);
+    if (!result.awakened) {
+      if (result.reason === "coins") notify?.({ kind: "error", title: "Not enough coins", detail: `Awakening costs ${result.cost} coins.` });
+      return null;
+    }
+    coinsRef.current = result.coins;
+    harvestedCropsRef.current = result.items;
+    fightersRef.current = result.fighters;
+    setCoins(result.coins);
+    setFighters(result.fighters);
+    setHarvestedCrops(result.items);
     awardFarmXp(FARM_XP_REWARDS.awaken);
+    return result.fighter;
   }
 
   function fuseFighters(selectedIds: string[]) {

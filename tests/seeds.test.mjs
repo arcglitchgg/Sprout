@@ -41,6 +41,28 @@ test("buying one seed uses its price and increments only that crop", () => {
   assert.equal(corn.seeds.corn, 1);
 });
 
+test("Buy 50 and Buy 100 charge one atomic total and add the requested quantity", () => {
+  const fifty = purchaseSeed(INITIAL_SEEDS, 1_000, "carrot", 50);
+  assert.equal(fifty.purchased, true);
+  assert.equal(fifty.totalPrice, 400);
+  assert.equal(fifty.coins, 600);
+  assert.deepEqual(fifty.seeds, { potato: 3, carrot: 50, corn: 0 });
+
+  const hundred = purchaseSeed(fifty.seeds, 2_000, "corn", 100);
+  assert.equal(hundred.purchased, true);
+  assert.equal(hundred.totalPrice, 1_200);
+  assert.equal(hundred.coins, 800);
+  assert.deepEqual(hundred.seeds, { potato: 3, carrot: 50, corn: 100 });
+});
+
+test("bulk purchase with insufficient funds leaves coins and seeds unchanged", () => {
+  const result = purchaseSeed(INITIAL_SEEDS, 499, "potato", 100);
+  assert.equal(result.purchased, false);
+  assert.equal(result.totalPrice, 500);
+  assert.equal(result.coins, 499);
+  assert.strictEqual(result.seeds, INITIAL_SEEDS);
+});
+
 test("buying while broke and planting at zero seeds are blocked", () => {
   const broke = purchaseSeed(INITIAL_SEEDS, 4, "potato");
   assert.equal(broke.purchased, false);

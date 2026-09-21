@@ -4,7 +4,7 @@ import type { CropType, SeedInventory } from "@/lib/game-types";
 export default function WorldSeedShopPanel({ coins, seeds, buySeed, onClose }: {
   coins: number;
   seeds: SeedInventory;
-  buySeed: (crop: CropType) => void;
+  buySeed: (crop: CropType, quantity?: number) => void;
   onClose: () => void;
 }) {
   return (
@@ -24,7 +24,12 @@ export default function WorldSeedShopPanel({ coins, seeds, buySeed, onClose }: {
               <span className="block text-2xl">{crop.emoji}</span><strong className="block">{crop.name}</strong>
               <span className="block">Seed: 🪙 {crop.cost}</span><span className="block">Grow: {crop.growTime}s</span>
               <span className="block">Base sell: 🪙 {crop.sellPrice}</span><span className="mt-1 block font-bold">Owned: {seeds[cropKey]}</span>
-              <button type="button" onClick={() => buySeed(cropKey)} disabled={coins < crop.cost} className="mt-2 w-full rounded-md bg-[#4f772d] px-2 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Buy 1</button>
+              <div className="mt-2 grid gap-1">
+                {[1, 50, 100].map((quantity) => {
+                  const total = crop.cost * quantity;
+                  return <button key={quantity} type="button" onClick={() => buySeed(cropKey, quantity)} disabled={coins < total} title={`Costs ${total} coins`} className="w-full rounded-md bg-[#4f772d] px-2 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Buy {quantity} · {total}</button>;
+                })}
+              </div>
             </div>
           );
         })}

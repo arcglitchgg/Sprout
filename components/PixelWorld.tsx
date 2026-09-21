@@ -42,7 +42,7 @@ type Props = {
   selectedCrop: CropType;
   setSelectedCrop: (crop: CropType) => void;
   seeds: SeedInventory;
-  buySeed: (crop: CropType) => void;
+  buySeed: (crop: CropType, quantity?: number) => void;
   handlePlotClick: (plot: Plot, clickedAt: number) => string | null;
   harvestAll: (clickedAt: number) => number;
   fighters: Fighter[];
@@ -305,7 +305,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
 
       {!visiting && seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
       {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
-      {!visiting && farmhouseOpen && <WorldFarmhouseOverlay collection={collection} fighters={fighters} ascensionPity={ascensionPity} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
+      {!visiting && farmhouseOpen && <WorldFarmhouseOverlay coins={coins} collection={collection} fighters={fighters} ascensionPity={ascensionPity} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
       {!visiting && marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
       {friendsOpen && <WorldFriendsOverlay fighters={fighters} onVisit={onVisit} onClose={() => setFriendsOpen(false)} presenceOwnerId={context.mode === "visiting" ? context.ownerId : user?.id ?? null} presenceRole={visiting ? "visitor" : "owner"} presenceMemberCount={presentIds.length} />}
       {ownerPrompt !== null && <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Challenge farm owner"><div className="w-full max-w-sm rounded-xl bg-[#fff8dc] p-5 text-[#2f3e2f]"><h3 className="break-words text-lg font-bold">Challenge {ownerPrompt}?</h3><p className="my-3 text-sm">Farm battles are coming next.</p><div className="flex gap-2"><button type="button" disabled className="rounded-lg bg-[#4f772d] px-3 py-2 text-white opacity-40">Battle · Coming next</button><button type="button" onClick={() => setOwnerPrompt(null)} className="rounded-lg border border-[#765438] px-3 py-2 font-bold">Cancel</button></div></div></div>}

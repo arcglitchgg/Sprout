@@ -4,6 +4,7 @@ import { useState } from "react";
 import CollectionBook from "@/components/CollectionBook";
 import FighterCard from "@/components/FighterCard";
 import HarvestedCropCard from "@/components/HarvestedCropCard";
+import { AWAKENING_COSTS } from "@/lib/awakening";
 import { ASCENSION_HARD_PITY, FUSION_UPGRADE_CHANCE, getFusionEligibility } from "@/lib/fusion";
 import { crops, mutations } from "@/lib/game-data";
 import type { AscensionPity, CollectionEntry, Fighter, HarvestedCrop, HarvestMutationType } from "@/lib/game-types";
@@ -14,6 +15,7 @@ type FarmhouseTab = "collection" | "fighters" | "harvested crops" | "fusion";
 
 export default function WorldFarmhouseOverlay({
   collection,
+  coins,
   fighters,
   ascensionPity,
   harvestedCrops,
@@ -22,6 +24,7 @@ export default function WorldFarmhouseOverlay({
   onClose,
 }: {
   collection: CollectionEntry[];
+  coins: number;
   fighters: Fighter[];
   ascensionPity: AscensionPity;
   harvestedCrops: HarvestedCrop[];
@@ -94,7 +97,11 @@ export default function WorldFarmhouseOverlay({
             <div className="rounded-xl bg-[#fff8dc] p-5 text-sm opacity-70">Harvest crops before awakening them into fighters.</div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {harvestedCrops.map((item) => <HarvestedCropCard key={item.id} item={item} actionLabel="Awaken" onAction={awakenCrop} />)}
+              {harvestedCrops.map((item) => {
+                const cost = AWAKENING_COSTS[item.mutation];
+                const shortfall = Math.max(0, cost - coins);
+                return <HarvestedCropCard key={item.id} item={item} actionLabel="Awaken" actionDetail={shortfall ? `Cost: ${cost} · Need ${shortfall} more` : `Cost: ${cost} coins`} actionDisabled={shortfall > 0} onAction={awakenCrop} />;
+              })}
             </div>
           ) : tab === "fusion" ? (
             <div className="space-y-3">
