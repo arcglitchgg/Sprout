@@ -26,6 +26,7 @@ export type WorldPlayer = {
   isOwner: boolean;
   isLocal: boolean;
   online: boolean;
+  reconnecting?: boolean;
   frame?: number;
   moving?: boolean;
 };

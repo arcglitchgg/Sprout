@@ -65,3 +65,18 @@ export function harvestPlot(
     items: [...items, item],
   };
 }
+
+/** Apply all eligible harvests to one snapshot; each crop gets its own roll and item. */
+export function harvestReadyPlots(
+  plots: Plot[], items: HarvestedCrop[], unlockedPlotCount: number, harvestedAt: number,
+  roll: () => MutationType,
+  createId: () => string = () => crypto.randomUUID(),
+) {
+  const harvested: HarvestedCrop[] = [];
+  const nextPlots = plots.map((plot) => {
+    if (plot.id >= unlockedPlotCount || !plot.crop || !isReady(plot, harvestedAt)) return plot;
+    harvested.push(createHarvestedCrop(plot.crop, roll(), harvestedAt, createId()));
+    return { ...plot, crop: null, plantedAt: null };
+  });
+  return { harvested, plots: harvested.length ? nextPlots : plots, items: harvested.length ? [...items, ...harvested] : items };
+}

@@ -6,8 +6,8 @@ export default function WorldPlayerEntity({ player, onInteract, labelScale = 1 }
   return <div className="pointer-events-none absolute z-30" style={{ left: player.x, top: player.y }}>
     <FarmerSprite frame={player.frame ?? FARMER_ANIMATION.idleFrame} facing={player.facing} moving={player.moving ?? false} />
     <span className="absolute bottom-[68px] left-0 max-w-40 origin-bottom truncate rounded-md border border-white/30 bg-[#172219]/90 px-2 py-1 text-center text-[15px] font-bold leading-tight text-[#fff8dc] shadow" style={{ transform: `translateX(-50%) scale(${labelScale})` }} title={player.displayName}>
-      {player.isOwner ? "★ " : ""}{player.displayName}{player.isOwner && !player.isLocal && player.online && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-lime-400" aria-label="Online" title="Online" />}
+      {player.isOwner ? "★ " : ""}{player.displayName}{player.reconnecting ? <span className="ml-1 text-amber-300" title="Reconnecting">· Reconnecting</span> : player.isOwner && !player.isLocal && player.online && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-lime-400" aria-label="Online" title="Online" />}
     </span>
-    {!player.isLocal && onInteract && <button type="button" aria-label={`Talk to ${player.displayName}`} onClick={(event) => { event.stopPropagation(); onInteract(player); }} className="pointer-events-auto absolute bottom-0 left-0 h-[76px] w-16 -translate-x-1/2 rounded-lg focus-visible:ring-2 focus-visible:ring-white" />}
+    {!player.isLocal && onInteract && <button type="button" disabled={player.reconnecting} aria-label={`Talk to ${player.displayName}`} onClick={(event) => { event.stopPropagation(); onInteract(player); }} className="pointer-events-auto absolute bottom-0 left-0 h-[76px] w-16 -translate-x-1/2 rounded-lg focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed" />}
   </div>;
 }

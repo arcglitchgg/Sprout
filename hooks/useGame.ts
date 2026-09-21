@@ -7,7 +7,7 @@ import { crops } from "@/lib/game-data";
 import { isReady, rollMutation } from "@/lib/farming";
 import { generateFighter } from "@/lib/fighters";
 import { fuseFighters as createFusion } from "@/lib/fusion";
-import { harvestPlot, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
+import { harvestPlot, harvestReadyPlots, removeHarvestedCrop, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { claimBattleVictoryReward, FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
 import type { CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
@@ -32,6 +32,7 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
   const plotsRef = useRef(plots);
   const seedsRef = useRef(seeds);
   const harvestedCropsRef = useRef(harvestedCrops);
+  const collectionRef = useRef(collection);
   const fightersRef = useRef(fighters);
 
   const farmLevel = getFarmLevel(farmXp);
@@ -110,8 +111,11 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
     harvestedCropsRef.current = result.items;
     setPlots(result.plots);
     setHarvestedCrops(result.items);
-    const alreadyDiscovered = collection.some((entry) => entry.crop === cropType && entry.mutation === mutation);
-    if (!alreadyDiscovered) setCollection((current) => [...current, { crop: cropType, mutation }]);
+    const alreadyDiscovered = collectionRef.current.some((entry) => entry.crop === cropType && entry.mutation === mutation);
+    if (!alreadyDiscovered) {
+      collectionRef.current = [...collectionRef.current, { crop: cropType, mutation }];
+      setCollection(collectionRef.current);
+    }
     const mutationName = mutation.charAt(0).toUpperCase() + mutation.slice(1);
     notify?.({
       kind: "success",
@@ -119,6 +123,32 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
       detail: `Worth 🪙 ${result.item.sellValue}`,
     });
     awardFarmXp(FARM_XP_REWARDS.harvest);
+  }
+
+  function harvestAll(clickedAt: number) {
+    const result = harvestReadyPlots(plotsRef.current, harvestedCropsRef.current, getUnlockedPlotCount(farmXpRef.current), clickedAt, rollMutation);
+    if (!result.harvested.length) return 0;
+    plotsRef.current = result.plots;
+    harvestedCropsRef.current = result.items;
+    setPlots(result.plots);
+    setHarvestedCrops(result.items);
+    const unique = new Map(collectionRef.current.map((entry) => [`${entry.crop}:${entry.mutation}`, entry]));
+    let discoveries = 0;
+    for (const item of result.harvested) {
+      const key = `${item.crop}:${item.mutation}`;
+      if (!unique.has(key)) { unique.set(key, { crop: item.crop, mutation: item.mutation }); discoveries += 1; }
+    }
+    if (discoveries) {
+      collectionRef.current = [...unique.values()];
+      setCollection(collectionRef.current);
+    }
+    awardFarmXp(result.harvested.length * FARM_XP_REWARDS.harvest);
+    const counts = { normal: 0, large: 0, golden: 0, prismatic: 0 };
+    for (const item of result.harvested) counts[item.mutation] += 1;
+    const detail = (Object.entries(counts) as [keyof typeof counts, number][])
+      .filter(([, count]) => count > 0).map(([mutation, count]) => `${count} ${mutation[0].toUpperCase()}${mutation.slice(1)}`).join(" · ");
+    notify?.({ kind: "success", title: `Harvested ${result.harvested.length} crops`, detail: discoveries ? `${detail} · ${discoveries} new discoveries` : detail });
+    return result.harvested.length;
   }
 
   function sellCrop(itemId: string) {
@@ -160,5 +190,5 @@ export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
     return fusion.result;
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, sellCrop, sellCrops, awakenCrop, fuseFighters, awardBattleVictory };
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, awardBattleVictory };
 }

@@ -170,7 +170,7 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
     assert.deepEqual(hook.presentUserIds(channels[1].state), ["22222"]);
     channels[1].state = {};
     channels[1].sync();
-    assert.equal(stateUpdates.at(-2), false);
+    assert.ok(stateUpdates.some((value) => Array.isArray(value) && value.includes("22222")), "brief loss retains owner during grace");
     leaveFriend();
     assert.equal(channels[1].removed, true);
     hook.useFarmPresence("session", "11111", "11111");
@@ -314,6 +314,16 @@ test("challenge Broadcast handles busy, accept, decline, cancel, timeout, and ro
     assert.equal(await runtime.requestChallenge("22222"), true);
     roomState = { a: [{ userId: "11111", isOwner: true }] };
     callbacks.get("presence:sync")();
+    assert.ok(!updates.includes("Player left the farm."), "brief loss does not cancel setup");
+    roomState = { a: [{ userId: "11111", isOwner: true }], b: [{ userId: "22222", isOwner: false }] };
+    callbacks.get("presence:sync")();
+    assert.ok(!updates.includes("Player left the farm."), "reconnect preserves setup");
+    const leaveAt = Date.now();
+    roomState = { a: [{ userId: "11111", isOwner: true }] };
+    callbacks.get("presence:sync")();
+    const clock = Date.now;
+    try { Date.now = () => leaveAt + 8001; intervals[1](); }
+    finally { Date.now = clock; }
     assert.ok(updates.includes("Player left the farm."));
     roomState = { a: [{ userId: "11111", isOwner: true }], b: [{ userId: "22222", isOwner: false }] };
     callbacks.get("presence:sync")();

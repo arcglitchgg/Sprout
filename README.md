@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Sprout is a farming and auto-battle game for Discord Activities, also playable in a standalone browser. See [game design direction](docs/game-design.md) for the current systems and planned progression and economy.
 
 ## Getting Started
 
