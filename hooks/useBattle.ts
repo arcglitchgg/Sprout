@@ -20,10 +20,10 @@ export function useBattle() {
     return () => clearInterval(interval);
   }, [status]);
 
-  function startBattle(team: Fighter[]) {
+  function startBattle(team: Fighter[], enemyTeam?: Fighter[]) {
     if (running.current) return;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-    const next = createBattle(team, crypto.randomUUID(), seed);
+    const next = createBattle(team, crypto.randomUUID(), seed, enemyTeam);
     running.current = true;
     startedAt.current = performance.now();
     setBattle(next);

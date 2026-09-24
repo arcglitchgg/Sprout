@@ -27,7 +27,7 @@ const position = (fighter: PlacedFighter) => ({
   y: fighter.slot === 0 ? 49 : fighter.slot === 1 ? 24 : 75,
 });
 
-export default function BattleArena({ battle, team, onProgress, sideLabels = ["Your garden", "Training rivals"] }: { battle: BattleState | null; team: (Fighter | undefined)[]; onProgress: (progress: BattlePresentationProgress) => void; sideLabels?: [string, string] }) {
+export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_TEAM, onProgress, sideLabels = ["Your garden", "Training rivals"] }: { battle: BattleState | null; team: (Fighter | undefined)[]; previewEnemyTeam?: Fighter[]; onProgress: (progress: BattlePresentationProgress) => void; sideLabels?: [string, string] }) {
   const latest = useRef(battle);
   const cursor = useRef(0);
   const visibleLogCount = useRef(battle ? 1 : 0);
@@ -137,7 +137,7 @@ export default function BattleArena({ battle, team, onProgress, sideLabels = ["Y
 
   const fighters: PlacedFighter[] = battle?.combatants.map((fighter) => ({ ...fighter, currentHp: displayHp[fighter.id] ?? fighter.hp })) ?? [
     ...team.flatMap((fighter, slot) => fighter ? [{ ...fighter, side: "player" as const, slot, currentHp: fighter.hp }] : []),
-    ...TRAINING_TEAM.map((fighter, slot) => ({ ...fighter, side: "enemy" as const, slot, currentHp: fighter.hp })),
+    ...previewEnemyTeam.map((fighter, slot) => ({ ...fighter, side: "enemy" as const, slot, currentHp: fighter.hp })),
   ];
   const event = active === null ? undefined : battle?.decisions[active];
   const actor = fighters.find((fighter) => fighter.id === event?.actorId);
@@ -154,11 +154,11 @@ export default function BattleArena({ battle, team, onProgress, sideLabels = ["Y
     "--travel-y": `${position(to).y - position(from).y}cqh`,
   } as CSSProperties);
 
-  return <div className="battle-arena relative h-[440px] overflow-hidden rounded-2xl border-4 border-[#637a45] bg-[#b7cc8b] text-[#2f3e2f]" aria-label="3 versus 3 battlefield">
+  return <div className="battle-arena relative h-[440px] overflow-hidden rounded-2xl border-4 border-[#637a45] bg-[#b7cc8b] text-[#2f3e2f]" aria-label={`3 versus ${fighters.filter((fighter) => fighter.side === "enemy").length} battlefield`}>
     <div className="absolute inset-x-4 top-3 flex justify-between text-sm font-bold"><span>{sideLabels[0]}</span><span>{sideLabels[1]}</span></div>
     <div className="absolute inset-y-14 left-1/2 border-l-2 border-dashed border-[#637a45]/30" />
     {fighters.map((fighter) => <div key={fighter.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${position(fighter).x}%`, top: `${position(fighter).y}%` }}>
-      <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot}
+      <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot} scale={fighter.visualScale}
         animationKey={active}
         dialogue={dialogue?.id === fighter.id ? dialogue.text : undefined}
         impact={phase === "reaction" && reaction === "hurt" && !intercept && event?.actualTargetId === fighter.id ? event.chosenAction === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : undefined}
@@ -167,7 +167,7 @@ export default function BattleArena({ battle, team, onProgress, sideLabels = ["Y
         moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.chosenAction !== "kernel-burst" || showingIntercept && recipient?.id === fighter.id))} />
     </div>)}
     {showingAction && event && actor && destination && <div key={`action-${active}`} className={`battle-traveler battle-${event.chosenAction}`} style={travel(actor, destination)} aria-hidden="true">
-      {event.chosenAction === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} />}
+      {event.chosenAction === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} /></span>}
     </div>}
     {showingIntercept && event && intercept && <div key={`guard-${active}`} className={`battle-traveler ${phase === "intercept-return" ? "battle-intercept-return" : "battle-intercept-engage"}`} style={travel(recipient, intended)} aria-hidden="true">
       <div className={`${phase === "reaction" && reaction === "hurt" ? event.chosenAction === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : ""} ${recipient.currentHp === 0 ? "battle-ko" : ""}`}>

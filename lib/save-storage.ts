@@ -26,6 +26,12 @@ const isFighterMutation = (value: unknown): value is MutationType => fighterMuta
 const isPersonality = (value: unknown): value is PersonalityType => personalities.includes(value as PersonalityType);
 const validAscensionPity = (value: unknown) => isRecord(value) && crops.every((crop) =>
   Number.isInteger(value[crop]) && (value[crop] as number) >= 0 && (value[crop] as number) < 3);
+const validDungeonProgress = (value: unknown) => {
+  if (!isRecord(value) || !Number.isInteger(value.highestClearedFloor) || (value.highestClearedFloor as number) < 0 || (value.highestClearedFloor as number) > 20) return false;
+  if (value.floor20FirstClear === undefined) return true;
+  if (!isRecord(value.floor20FirstClear) || !isFiniteNonnegative(value.floor20FirstClear.clearedAt) || !Array.isArray(value.floor20FirstClear.team) || value.floor20FirstClear.team.length !== 3) return false;
+  return value.floor20FirstClear.team.every((fighter) => isRecord(fighter) && isCrop(fighter.crop) && isFighterMutation(fighter.mutation) && Number.isSafeInteger(fighter.level) && (fighter.level as number) >= 1);
+};
 
 function validFarmerTile(value: unknown) {
   if (!isRecord(value) || !Number.isInteger(value.x) || !Number.isInteger(value.y)) return false;
@@ -53,6 +59,7 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   if (!isFiniteNonnegative(game.coins) || !isCrop(game.selectedCrop) || !isRecord(game.seeds)) return false;
   if (requireFarmXp && !isFiniteNonnegative(game.farmXp)) return false;
   if (requireFarmXp && game.ascensionPity !== undefined && !validAscensionPity(game.ascensionPity)) return false;
+  if (requireFighterProgression && game.dungeon !== undefined && !validDungeonProgress(game.dungeon)) return false;
   const seeds = game.seeds;
   if (!crops.every((crop) => Number.isInteger(seeds[crop]) && (seeds[crop] as number) >= 0)) return false;
   if (!validPlots(game.plots, plotCount)) return false;
@@ -126,6 +133,7 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
       collection: value.game.collection.map((entry) => ({ ...entry })),
       fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0 })),
       ascensionPity: value.game.ascensionPity ? { ...value.game.ascensionPity } : undefined,
+      dungeon: { highestClearedFloor: 0 },
     },
     world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
   };

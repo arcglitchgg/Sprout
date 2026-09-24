@@ -193,3 +193,13 @@ test("victory, defeat, and 60-second draw rules remain intact", () => {
   assert.equal(result.status, "draw");
   assert.equal(result.elapsed, 60000);
 });
+
+test("dungeon battles safely support one, two, or three enemies", () => {
+  const enemies = fresh().combatants.slice(3).map(({ side, slot, currentHp, nextActionAt, actions, guardReady, ...fighter }) => fighter);
+  for (const count of [1, 2, 3]) {
+    const battle = createBattle(team, `enemy-count-${count}`, 42, enemies.slice(0, count));
+    assert.equal(battle.combatants.filter((fighter) => fighter.side === "enemy").length, count);
+    assert.doesNotThrow(() => advanceBattle(battle, 60000));
+  }
+  assert.throws(() => createBattle(team, "none", 42, []));
+});

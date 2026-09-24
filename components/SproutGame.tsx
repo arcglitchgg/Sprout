@@ -30,7 +30,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
   const dismissNotification = useCallback((id: string) => {
     setNotifications((current) => current.filter((notification) => notification.id !== id));
   }, []);
-  const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, handlePlotClick, harvestAll, sellCrops, awakenCrop, fuseFighters, awardBattleVictory } = useGame(initialSave?.game, notify);
+  const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrops, awakenCrop, fuseFighters, awardDungeonVictory } = useGame(initialSave?.game, notify);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
@@ -39,10 +39,10 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
 
   useEffect(() => {
     scheduleSave({
-      game: { coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, ascensionPity },
+      game: { coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, ascensionPity, dungeon },
       world: farmerWorld,
     });
-  }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, ascensionPity, farmerWorld, scheduleSave]);
+  }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, ascensionPity, dungeon, farmerWorld, scheduleSave]);
 
   return (
     <main className="h-dvh overflow-hidden bg-[#171c19] p-2 text-[#2f3e2f] sm:p-3">
@@ -71,7 +71,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
         </header>
 
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} ascensionPity={ascensionPity} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} awardBattleVictory={awardBattleVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
         </div>
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (
@@ -113,7 +113,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
             </div>
           )}
         </section>
-          <Battle fighters={fighters} onVictory={awardBattleVictory} />
+          <Battle fighters={fighters} onVictory={(result) => { awardDungeonVictory(result, 1); }} />
         </div>
         </div>
         )}

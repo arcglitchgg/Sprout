@@ -28,6 +28,8 @@ import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
 import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
 import type { BattleState } from "@/lib/battle-types";
+import type { DungeonVictoryReward } from "@/lib/dungeon";
+import type { DungeonProgress } from "@/lib/save-types";
 import type { WorldBuildingId } from "@/lib/world-types";
 import type { WorldPoint } from "@/lib/world-types";
 
@@ -47,12 +49,13 @@ type Props = {
   harvestAll: (clickedAt: number) => number;
   fighters: Fighter[];
   ascensionPity: AscensionPity;
+  dungeon: DungeonProgress;
   collection: CollectionEntry[];
   harvestedCrops: HarvestedCrop[];
   sellCrops: (itemIds: string[]) => void;
   awakenCrop: (itemId: string) => void;
   fuseFighters: (selectedIds: string[]) => Fighter | null;
-  awardBattleVictory: (result: BattleState) => void;
+  awardDungeonVictory: (result: BattleState, floor: number) => DungeonVictoryReward | null;
   notifications: WorldNotification[];
   notify: (notification: Omit<WorldNotification, "id">) => void;
   onDismissNotification: (id: string) => void;
@@ -70,7 +73,7 @@ export default function PixelWorld(props: Props) {
     onReturnHome={() => setContext({ mode: "own-farm" })} />;
 }
 
-function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, ascensionPity, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, awardBattleVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
+function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, ascensionPity, dungeon, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, awardDungeonVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
   context: WorldContext; onVisit: (snapshot: FriendFarmSnapshot) => void; onReturnHome: () => void; cameraMode: CameraMode; setCameraMode: (mode: CameraMode) => void;
 }) {
   const visiting = !canModifyFarm(context);
@@ -304,7 +307,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       )}
 
       {!visiting && seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
-      {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} onVictory={awardBattleVictory} onClose={() => setDungeonOpen(false)} />}
+      {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} progress={dungeon} onVictory={awardDungeonVictory} onClose={() => setDungeonOpen(false)} />}
       {!visiting && farmhouseOpen && <WorldFarmhouseOverlay coins={coins} collection={collection} fighters={fighters} ascensionPity={ascensionPity} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} onClose={() => setFarmhouseOpen(false)} />}
       {!visiting && marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
       {friendsOpen && <WorldFriendsOverlay fighters={fighters} onVisit={onVisit} onClose={() => setFriendsOpen(false)} presenceOwnerId={context.mode === "visiting" ? context.ownerId : user?.id ?? null} presenceRole={visiting ? "visitor" : "owner"} presenceMemberCount={presentIds.length} />}

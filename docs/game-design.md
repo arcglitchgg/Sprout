@@ -25,7 +25,7 @@ Plant → harvest mutated crops
 
 - Harvested crops enter an individual-item inventory. The Market sells them; the Farmhouse awakens them for a rarity-based coin cost.
 - Farm Level uses account-wide Farm XP and unlocks plots. It is distinct from the proposed per-fighter XP and levels.
-- Dungeon battles currently award 20 coins and 15 Farm XP on a once-only victory boundary. Fighters now persist cumulative XP and levels, but no gameplay action awards Fighter XP yet.
+- Dungeon has 20 sequential, replayable floors with boss encounters on Floors 5, 10, 15, and 20. Victories award 20 coins, 15 Farm XP, and floor-scaled Fighter XP to the three participants on a once-only battle boundary.
 - Each current species has Basic Attack and one weighted auto-cast skill. Personalities influence choices and targeting. Skills are available immediately; level-based unlocks do not exist.
 - Fusion accepts four fighters of one species and one tier. Four Normal yield 70% Normal / 30% Large; four Large have a 30% Golden chance; four Golden have a 25% Prismatic chance; four Prismatic have a 35% Ascended chance with a guaranteed result on that species' third attempt. Failures return the input tier. Ascended cannot fuse further. Fusion grants no Farm XP.
 - PvP uses stored fighter snapshots and seeded battle resolution. A server-finalized winner receives one persistent PvP Win; PvP grants no coins, Farm XP, or fighter XP. There is no PvP rank or season system.

@@ -1,6 +1,12 @@
 import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, LegacyFighter, Plot, SeedInventory } from "@/lib/game-types";
 import type { WorldPoint } from "@/lib/world-types";
 
+export type DungeonFirstClearFighter = Pick<Fighter, "crop" | "mutation" | "level">;
+export type DungeonProgress = {
+  highestClearedFloor: number;
+  floor20FirstClear?: { clearedAt: number; team: DungeonFirstClearFighter[] };
+};
+
 type SproutGameSaveBase<TFighter> = {
   coins: number;
   seeds: SeedInventory;
@@ -13,7 +19,7 @@ type SproutGameSaveBase<TFighter> = {
 
 export type SproutGameSaveV1 = SproutGameSaveBase<LegacyFighter>;
 export type SproutGameSaveV2 = SproutGameSaveBase<LegacyFighter> & { farmXp: number; ascensionPity?: AscensionPity };
-export type SproutGameSaveV3 = SproutGameSaveBase<Fighter> & { farmXp: number; ascensionPity?: AscensionPity };
+export type SproutGameSaveV3 = SproutGameSaveBase<Fighter> & { farmXp: number; ascensionPity?: AscensionPity; dungeon?: DungeonProgress };
 export type SproutWorldSave = { farmerTile: WorldPoint; facing: "left" | "right" };
 export type SproutSaveV1 = { version: 1; savedAt: number; game: SproutGameSaveV1; world: SproutWorldSave };
 export type SproutSaveV2 = { version: 2; savedAt: number; game: SproutGameSaveV2; world: SproutWorldSave };

@@ -16,7 +16,7 @@ export function createBattle(team: Fighter[], id: string, seed = 0, enemyTeam: F
   if (team.length !== 3 || new Set(team.map((fighter) => fighter.id)).size !== 3) {
     throw new Error("Select exactly three distinct fighters.");
   }
-  if (enemyTeam.length !== 3 || new Set([...team, ...enemyTeam].map((fighter) => fighter.id)).size !== 6) throw new Error("Battle teams need six distinct fighters.");
+  if (enemyTeam.length < 1 || enemyTeam.length > 3 || new Set([...team, ...enemyTeam].map((fighter) => fighter.id)).size !== team.length + enemyTeam.length) throw new Error("Battle needs one to three distinct enemies.");
   const copyTeam = (fighters: Fighter[], side: BattleSide): Combatant[] => fighters.map((fighter, slot) => {
     const effective = getEffectiveFighter(fighter);
     return {

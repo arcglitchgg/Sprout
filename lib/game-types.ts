@@ -50,6 +50,7 @@ export type Fighter = {
   speed: number;
   level: number;
   xp: number;
+  visualScale?: number;
 };
 
 export type LegacyFighter = Omit<Fighter, "level" | "xp">;

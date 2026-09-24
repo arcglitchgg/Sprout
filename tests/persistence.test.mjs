@@ -141,6 +141,20 @@ test("optional per-species Ascension pity round-trips in V3 and rejects corrupt 
   assert.equal(validateSproutSave(save), true);
 });
 
+test("Dungeon floor progress and optional Floor 20 telemetry persist in Save V3", () => {
+  const save = validSave();
+  save.game.dungeon = { highestClearedFloor: 20, floor20FirstClear: { clearedAt: 40_000, team: [
+    { crop: "potato", mutation: "ascended", level: 8 },
+    { crop: "carrot", mutation: "golden", level: 7 },
+    { crop: "corn", mutation: "prismatic", level: 9 },
+  ] } };
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  assert.deepEqual(loadSproutSave(storage).save.game.dungeon, save.game.dungeon);
+  save.game.dungeon.highestClearedFloor = 21;
+  assert.equal(validateSproutSave(save), false);
+});
+
 test("corrupted structures fall back without partial hydration", () => {
   const corrupted = validSave();
   corrupted.game.plots.pop();
