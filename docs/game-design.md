@@ -25,11 +25,11 @@ Plant → harvest mutated crops
 
 - Harvested crops enter an individual-item inventory. The Market sells them; the Farmhouse awakens them for a rarity-based coin cost.
 - Farm Level uses account-wide Farm XP and unlocks plots. It is distinct from the proposed per-fighter XP and levels.
-- Dungeon battles currently award 20 coins and 15 Farm XP on a once-only victory boundary. Fighters do **not** earn XP or levels.
+- Dungeon battles currently award 20 coins and 15 Farm XP on a once-only victory boundary. Fighters now persist cumulative XP and levels, but no gameplay action awards Fighter XP yet.
 - Each current species has Basic Attack and one weighted auto-cast skill. Personalities influence choices and targeting. Skills are available immediately; level-based unlocks do not exist.
 - Fusion accepts four fighters of one species and one tier. Four Normal yield 70% Normal / 30% Large; four Large have a 30% Golden chance; four Golden have a 25% Prismatic chance; four Prismatic have a 35% Ascended chance with a guaranteed result on that species' third attempt. Failures return the input tier. Ascended cannot fuse further. Fusion grants no Farm XP.
 - PvP uses stored fighter snapshots and seeded battle resolution. A server-finalized winner receives one persistent PvP Win; PvP grants no coins, Farm XP, or fighter XP. There is no PvP rank or season system.
-- Save V2 stores farm and fighter state plus optional per-species Ascension pity counters. Old V2 saves load with zero pity. Fighter XP and levels remain a future migration concern, likely Save V3.
+- Save V3 stores farm state, Ascension pity, and fighter level/XP. V1 and V2 saves migrate forward without regenerating fighters; migrated fighters begin at Level 1 with 0 XP.
 
 ## Coin economy and awakening
 
@@ -67,7 +67,7 @@ Ascended should offer aspiration without invalidating lower tiers or guaranteein
 
 Keep **rarity** (how exceptional a fighter is) separate from **level** (how much it has trained). A newly fused Level 1 Ascended fighter should still need Dungeon participation to unlock its potential. Dungeon should become the main source of per-fighter XP, stage/floor progression, and perhaps skill materials or first-clear rewards later. It should not become the dominant coin farm; its current 20-coin victory reward needs review when the economy changes.
 
-Plan persistent fighter level and XP, with an early cap such as Level 10 or 20 to test. Do not lock XP curves or level values yet. A small illustrative unlock schedule is Basic Attack at Level 1, Skill 1 at Level 3, Skill 2 at Level 6, and a signature skill at Level 10. These levels are placeholders. Aim for about two or three meaningful unlockable species skills plus signature behavior, not a large skill tree. Keep weighted auto-cast selection, battlefield-aware weights, and personality-driven targeting as skills expand.
+Fighter XP is cumulative and has no current level cap. The next-level requirement is `50 + 30 × (current level - 1)`. Effective HP, ATK, DEF, and Speed gain 3% per level above Level 1 while generated stats remain stable base values. A small illustrative unlock schedule is Basic Attack at Level 1, Skill 1 at Level 3, Skill 2 at Level 6, and a signature skill at Level 10. These skill levels are placeholders. Aim for about two or three meaningful unlockable species skills plus signature behavior, not a large skill tree. Keep weighted auto-cast selection, battlefield-aware weights, and personality-driven targeting as skills expand.
 
 PvP should initially give no fighter XP, or very little if testing later supports it, so players cannot level fighters by repeatedly challenging friends.
 

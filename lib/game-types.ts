@@ -48,7 +48,11 @@ export type Fighter = {
   attack: number;
   defense: number;
   speed: number;
+  level: number;
+  xp: number;
 };
+
+export type LegacyFighter = Omit<Fighter, "level" | "xp">;
 
 export type HarvestedCrop = {
   id: string;

@@ -11,12 +11,12 @@ import { harvestPlot, harvestReadyPlots, sellHarvestedCrop, sellHarvestedCrops }
 import { claimBattleVictoryReward, FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
 import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
-import type { SproutGameSaveV2 } from "@/lib/save-types";
+import type { SproutGameSaveV3 } from "@/lib/save-types";
 import type { WorldNotification } from "@/components/WorldNotifications";
 
 type Notify = (notification: Omit<WorldNotification, "id">) => void;
 
-export function useGame(initial?: SproutGameSaveV2, notify?: Notify) {
+export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
   const rewardedBattles = useRef(new Set<string>());
   const [coins, setCoins] = useState(initial?.coins ?? 100);
   const [farmXp, setFarmXp] = useState(initial?.farmXp ?? 0);

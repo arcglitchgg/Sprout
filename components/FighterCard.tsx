@@ -1,7 +1,9 @@
 import { crops, mutations, personalities } from "@/lib/game-data";
+import { getEffectiveFighter } from "@/lib/fighter-progression";
 import type { Fighter } from "@/lib/game-types";
 
 export default function FighterCard({ fighter }: { fighter: Fighter }) {
+  const effective = getEffectiveFighter(fighter);
   return (
     <div
       className="rounded-xl bg-[#fff8dc] p-4"
@@ -32,6 +34,8 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         }
       </div>
 
+      <div className="mt-1 text-xs font-black text-[#4f772d]">Lv. {fighter.level}</div>
+
       <div className="text-xs opacity-60">
         {
           personalities[
@@ -44,25 +48,25 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
         <div>
           ❤️
           <br />
-          {fighter.hp}
+          {effective.hp}
         </div>
 
         <div>
           ⚔️
           <br />
-          {fighter.attack}
+          {effective.attack}
         </div>
 
         <div>
           🛡️
           <br />
-          {fighter.defense}
+          {effective.defense}
         </div>
 
         <div>
           ⚡
           <br />
-          {fighter.speed}
+          {effective.speed}
         </div>
       </div>
     </div>

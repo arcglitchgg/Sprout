@@ -1,6 +1,6 @@
 import { getUnlockedPlotCount } from "@/lib/progression";
 import type { Fighter } from "@/lib/game-types";
-import type { SproutSaveV2 } from "@/lib/save-types";
+import type { SproutSaveV3 } from "@/lib/save-types";
 import type { DefenseFighter, FriendAction, FriendFarmSnapshot, SproutProfile, WorldContext } from "@/lib/social-types";
 
 export const isPlayerId = (id: unknown): id is string => typeof id === "string" && /^\d{5,25}$/.test(id);
@@ -29,7 +29,7 @@ export function buildDefenseSnapshot(roster: readonly Fighter[], ids: unknown): 
   const snapshot = ids.map((id, slot) => {
     const fighter = roster.find((entry) => entry.id === id);
     if (!fighter) throw new Error("A fighter is not in your latest cloud save. Wait for save sync, then try again.");
-    return { slot, id: fighter.id, crop: fighter.crop, mutation: fighter.mutation, personality: fighter.personality, hp: fighter.hp, attack: fighter.attack, defense: fighter.defense, speed: fighter.speed };
+    return { slot, id: fighter.id, crop: fighter.crop, mutation: fighter.mutation, personality: fighter.personality, hp: fighter.hp, attack: fighter.attack, defense: fighter.defense, speed: fighter.speed, level: fighter.level, xp: fighter.xp };
   });
   calculateCombatPower(snapshot);
   return snapshot;
@@ -44,7 +44,7 @@ export function publicProfile(row: Record<string, unknown>): SproutProfile {
   };
 }
 
-export function sanitizeFarmSnapshot(owner: SproutProfile, save: SproutSaveV2): FriendFarmSnapshot {
+export function sanitizeFarmSnapshot(owner: SproutProfile, save: SproutSaveV3): FriendFarmSnapshot {
   const unlockedPlotCount = getUnlockedPlotCount(save.game.farmXp);
   return {
     owner: { userId: owner.userId, username: owner.username, displayName: owner.displayName, avatar: owner.avatar, farmLevel: owner.farmLevel, coins: owner.coins, combatPower: owner.combatPower, pvpWins: owner.pvpWins },

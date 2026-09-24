@@ -1,15 +1,16 @@
 import { FIRST_WORLD } from "@/lib/world-data";
 import { TOTAL_FARM_PLOTS } from "@/lib/progression";
+import { getLevelFromXp } from "@/lib/fighter-progression";
 import type { CropType, HarvestMutationType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
-import type { SproutSaveV1, SproutSaveV2 } from "@/lib/save-types";
+import type { SproutSaveV1, SproutSaveV2, SproutSaveV3 } from "@/lib/save-types";
 
 export const SAVE_KEY = "sprout.save";
 export const discordSaveKey = (userId: string) => `sprout.save.${userId}`;
-export const CURRENT_SAVE_VERSION = 2;
+export const CURRENT_SAVE_VERSION = 3;
 
 export type SaveLoadResult =
   | { status: "empty" | "invalid" | "future"; save: null }
-  | { status: "loaded"; save: SproutSaveV2 };
+  | { status: "loaded"; save: SproutSaveV3 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const crops: CropType[] = ["potato", "carrot", "corn"];
@@ -46,7 +47,7 @@ function validPlots(value: unknown, expectedCount: number) {
   return true;
 }
 
-function validSharedSave(value: Record<string, unknown>, plotCount: number, requireFarmXp: boolean) {
+function validSharedSave(value: Record<string, unknown>, plotCount: number, requireFarmXp: boolean, requireFighterProgression = false) {
   if (!isFiniteNonnegative(value.savedAt) || !isRecord(value.game) || !isRecord(value.world)) return false;
   const game = value.game;
   if (!isFiniteNonnegative(game.coins) || !isCrop(game.selectedCrop) || !isRecord(game.seeds)) return false;
@@ -69,6 +70,7 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   for (const fighter of game.fighters) {
     if (!isRecord(fighter) || !isId(fighter.id) || fighterIds.has(fighter.id) || !isCrop(fighter.crop) || !isFighterMutation(fighter.mutation) || !isPersonality(fighter.personality)) return false;
     if (![fighter.hp, fighter.attack, fighter.defense, fighter.speed].every(isFiniteNonnegative)) return false;
+    if (requireFighterProgression && (!Number.isSafeInteger(fighter.level) || (fighter.level as number) < 1 || !Number.isSafeInteger(fighter.xp) || (fighter.xp as number) < 0 || fighter.level !== getLevelFromXp(fighter.xp as number))) return false;
     fighterIds.add(fighter.id);
   }
 
@@ -79,8 +81,12 @@ export function validateSproutSaveV1(value: unknown): value is SproutSaveV1 {
   return isRecord(value) && value.version === 1 && validSharedSave(value, 9, false);
 }
 
-export function validateSproutSave(value: unknown): value is SproutSaveV2 {
+export function validateSproutSaveV2(value: unknown): value is SproutSaveV2 {
   return isRecord(value) && value.version === 2 && validSharedSave(value, TOTAL_FARM_PLOTS, true);
+}
+
+export function validateSproutSave(value: unknown): value is SproutSaveV3 {
+  return isRecord(value) && value.version === 3 && validSharedSave(value, TOTAL_FARM_PLOTS, true, true);
 }
 
 export function migrateV1ToV2(value: unknown): SproutSaveV2 | null {
@@ -104,13 +110,37 @@ export function migrateV1ToV2(value: unknown): SproutSaveV2 | null {
     },
     world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
   };
+  return validateSproutSaveV2(migrated) ? migrated : null;
+}
+
+export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
+  if (!validateSproutSaveV2(value)) return null;
+  const migrated: SproutSaveV3 = {
+    version: 3,
+    savedAt: value.savedAt,
+    game: {
+      ...value.game,
+      seeds: { ...value.game.seeds },
+      plots: value.game.plots.map((plot) => ({ ...plot })),
+      harvestedCrops: value.game.harvestedCrops.map((item) => ({ ...item })),
+      collection: value.game.collection.map((entry) => ({ ...entry })),
+      fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0 })),
+      ascensionPity: value.game.ascensionPity ? { ...value.game.ascensionPity } : undefined,
+    },
+    world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
+  };
   return validateSproutSave(migrated) ? migrated : null;
 }
 
-function migrateSupportedSave(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.version === 1) return migrateV1ToV2(value);
-  return value;
+export function migrateSproutSave(value: unknown): SproutSaveV3 | null {
+  if (validateSproutSave(value)) return value;
+  if (!isRecord(value)) return null;
+  if (value.version === 1) {
+    const v2 = migrateV1ToV2(value);
+    return v2 ? migrateV2ToV3(v2) : null;
+  }
+  if (value.version === 2) return migrateV2ToV3(value);
+  return null;
 }
 
 function developmentWarning(message: string, error?: unknown) {
@@ -128,8 +158,8 @@ export function loadSproutSave(storage?: StorageLike, key = SAVE_KEY): SaveLoadR
       developmentWarning("Sprout save is from a newer version and will not be overwritten.");
       return { status: "future", save: null };
     }
-    const migrated = migrateSupportedSave(parsed);
-    if (!validateSproutSave(migrated)) {
+    const migrated = migrateSproutSave(parsed);
+    if (!migrated) {
       developmentWarning("Sprout save is invalid; starting with fresh progress.");
       return { status: "invalid", save: null };
     }
@@ -140,7 +170,7 @@ export function loadSproutSave(storage?: StorageLike, key = SAVE_KEY): SaveLoadR
   }
 }
 
-export function writeSproutSave(save: SproutSaveV2, storage?: StorageLike, key = SAVE_KEY) {
+export function writeSproutSave(save: SproutSaveV3, storage?: StorageLike, key = SAVE_KEY) {
   if (!validateSproutSave(save)) return false;
   const target = storage ?? (typeof window !== "undefined" ? window.localStorage : null);
   if (!target) return false;

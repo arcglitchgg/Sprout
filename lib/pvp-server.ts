@@ -1,6 +1,6 @@
 import "server-only";
 import { readCloudSave, supabaseRequest } from "@/lib/supabase-admin";
-import { validateSproutSave } from "@/lib/save-storage";
+import { migrateSproutSave } from "@/lib/save-storage";
 import { SocialError } from "@/lib/social-server";
 import type { LivePvpMatch } from "@/lib/pvp-types";
 import { resolvePvpMatch } from "@/lib/pvp-resolution";
@@ -44,8 +44,8 @@ export async function cancelPvpMatch(actor: string, id: string) {
 export async function submitPvpTeam(actor: string, id: string, body: Record<string, unknown>) {
   if (!matchId(id) || !Array.isArray(body.fighterIds) || body.fighterIds.length !== 3 || body.fighterIds.some((value) => typeof value !== "string" || !value) || new Set(body.fighterIds).size !== 3) throw new SocialError(400, "Choose three distinct fighters.");
   const saved = await readCloudSave(actor);
-  const save = saved?.save;
-  if (!validateSproutSave(save)) throw new SocialError(409, "Wait for your cloud save to sync.");
+  const save = migrateSproutSave(saved?.save);
+  if (!save) throw new SocialError(409, "Wait for your cloud save to sync.");
   const ids = body.fighterIds as string[];
   if (ids.some((fighterId) => !save.game.fighters.some((fighter) => fighter.id === fighterId))) throw new SocialError(400, "A selected fighter is no longer in your roster.");
   // SQL locks the match and re-reads the latest save before copying fighter stats.

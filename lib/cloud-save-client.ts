@@ -1,7 +1,7 @@
 import { validateSproutSave } from "@/lib/save-storage";
-import type { SproutSaveV2 } from "@/lib/save-types";
+import type { SproutSaveV3 } from "@/lib/save-types";
 
-export type CloudSnapshot = { save: SproutSaveV2 | null; revision: number | null };
+export type CloudSnapshot = { save: SproutSaveV3 | null; revision: number | null };
 
 export async function fetchCloudSave(session: string): Promise<CloudSnapshot> {
   const response = await fetch("/api/game/save", { headers: { Authorization: `Bearer ${session}` }, cache: "no-store", signal: AbortSignal.timeout(5000) });
@@ -11,7 +11,7 @@ export async function fetchCloudSave(session: string): Promise<CloudSnapshot> {
   return { save: data.save, revision: data.revision };
 }
 
-export async function putCloudSave(session: string, save: SproutSaveV2, revision: number | null): Promise<number | "conflict"> {
+export async function putCloudSave(session: string, save: SproutSaveV3, revision: number | null): Promise<number | "conflict"> {
   const response = await fetch("/api/game/save", { method: "PUT", headers: { Authorization: `Bearer ${session}`, "Content-Type": "application/json" }, body: JSON.stringify({ save, revision }), cache: "no-store", keepalive: true, signal: AbortSignal.timeout(5000) });
   if (response.status === 409) return "conflict";
   if (!response.ok) throw new Error("Cloud save write failed.");

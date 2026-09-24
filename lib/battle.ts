@@ -2,6 +2,7 @@ import { BATTLE_DIALOGUE, BATTLE_LIMIT_MS, TRAINING_TEAM } from "@/lib/battle-da
 import { calculateDamage, getActionCandidates, rollAction } from "@/lib/skill-selection";
 import { ACTIONS } from "@/lib/skill-data";
 import { crops } from "@/lib/game-data";
+import { getEffectiveFighter } from "@/lib/fighter-progression";
 import type { BattleSide, BattleState, Combatant } from "@/lib/battle-types";
 import type { Fighter } from "@/lib/game-types";
 
@@ -16,10 +17,13 @@ export function createBattle(team: Fighter[], id: string, seed = 0, enemyTeam: F
     throw new Error("Select exactly three distinct fighters.");
   }
   if (enemyTeam.length !== 3 || new Set([...team, ...enemyTeam].map((fighter) => fighter.id)).size !== 6) throw new Error("Battle teams need six distinct fighters.");
-  const copyTeam = (fighters: Fighter[], side: BattleSide): Combatant[] => fighters.map((fighter, slot) => ({
-    ...fighter, side, slot, currentHp: fighter.hp, nextActionAt: actionInterval(fighter.speed),
-    actions: 0, guardReady: fighter.personality === "protective",
-  }));
+  const copyTeam = (fighters: Fighter[], side: BattleSide): Combatant[] => fighters.map((fighter, slot) => {
+    const effective = getEffectiveFighter(fighter);
+    return {
+      ...effective, side, slot, currentHp: effective.hp, nextActionAt: actionInterval(effective.speed),
+      actions: 0, guardReady: fighter.personality === "protective",
+    };
+  });
   return { id, mode, seed: seed >>> 0, rngState: seed >>> 0, decisions: [], status: "running", elapsed: 0, combatants: [...copyTeam(team, "player"), ...copyTeam(enemyTeam, "enemy")], log: [{ at: 0, message: mode === "friendly-pvp" ? "Friendly PvP battle started." : "Training Garden battle started." }] };
 }
 

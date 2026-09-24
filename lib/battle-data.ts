@@ -6,9 +6,9 @@ export const FORMATION = ["Front", "Rear Left", "Rear Right"];
 
 // Normal mutations; existing species and personality stat bonuses included once.
 export const TRAINING_TEAM: Fighter[] = [
-  { id: "enemy-potato", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20 },
-  { id: "enemy-carrot", crop: "carrot", mutation: "normal", personality: "clever", hp: 100, attack: 25, defense: 20, speed: 35 },
-  { id: "enemy-corn", crop: "corn", mutation: "normal", personality: "lazy", hp: 100, attack: 44, defense: 20, speed: 17 },
+  { id: "enemy-potato", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20, level: 1, xp: 0 },
+  { id: "enemy-carrot", crop: "carrot", mutation: "normal", personality: "clever", hp: 100, attack: 25, defense: 20, speed: 35, level: 1, xp: 0 },
+  { id: "enemy-corn", crop: "corn", mutation: "normal", personality: "lazy", hp: 100, attack: 44, defense: 20, speed: 17, level: 1, xp: 0 },
 ];
 
 export const BATTLE_DIALOGUE: Record<PersonalityType, string> = {

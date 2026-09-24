@@ -14,7 +14,7 @@ function load(name) {
   return loaded.exports;
 }
 
-const { SAVE_KEY, deleteSproutSave, loadSproutSave, migrateV1ToV2, validateSproutSave, writeSproutSave } = load("@/lib/save-storage");
+const { SAVE_KEY, deleteSproutSave, loadSproutSave, migrateV1ToV2, migrateV2ToV3, validateSproutSave, validateSproutSaveV2, writeSproutSave } = load("@/lib/save-storage");
 const { FIRST_WORLD } = load("@/lib/world-data");
 const { getSecondsRemaining } = load("@/lib/farming");
 
@@ -30,7 +30,7 @@ function memoryStorage(initial = {}) {
 
 function validSave() {
   return {
-    version: 2,
+    version: 3,
     savedAt: 50_000,
     game: {
       coins: 145,
@@ -40,7 +40,7 @@ function validSave() {
       plots: Array.from({ length: 144 }, (_, id) => id === 0 ? { id, crop: "potato", plantedAt: 10_000 } : { id, crop: null, plantedAt: null }),
       harvestedCrops: [{ id: "harvest-1", crop: "corn", mutation: "golden", baseSellValue: 30, sellValue: 90, harvestedAt: 20_000 }],
       collection: [{ crop: "corn", mutation: "golden" }],
-      fighters: [{ id: "fighter-1", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20 }],
+      fighters: [{ id: "fighter-1", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20, level: 1, xp: 0 }],
     },
     world: { farmerTile: { ...FIRST_WORLD.start }, facing: "left" },
   };
@@ -49,8 +49,17 @@ function validSave() {
 function validV1Save() {
   const save = validSave();
   delete save.game.farmXp;
+  delete save.game.fighters[0].level;
+  delete save.game.fighters[0].xp;
   save.version = 1;
   save.game.plots = save.game.plots.slice(0, 9);
+  return save;
+}
+
+function validV2Save() {
+  const save = validSave();
+  save.version = 2;
+  save.game.fighters = save.game.fighters.map(({ level, xp, ...fighter }) => fighter);
   return save;
 }
 
@@ -71,7 +80,7 @@ test("planted timestamps survive loading and advance against current time", () =
   assert.equal(getSecondsRemaining(loaded.game.plots[0], 30_000), 0);
 });
 
-test("V1 migrates to V2 without losing planted plots or durable progress", () => {
+test("V1 migration preserves durable progress and loads through V3", () => {
   const v1 = validV1Save();
   const migrated = migrateV1ToV2(v1);
   assert.ok(migrated);
@@ -84,10 +93,31 @@ test("V1 migrates to V2 without losing planted plots or durable progress", () =>
   assert.deepEqual(migrated.world, v1.world);
 
   const storage = memoryStorage({ [SAVE_KEY]: JSON.stringify(v1) });
-  assert.deepEqual(loadSproutSave(storage), { status: "loaded", save: migrated });
+  const loaded = loadSproutSave(storage);
+  assert.equal(loaded.status, "loaded");
+  assert.equal(loaded.save.version, 3);
+  assert.deepEqual(loaded.save.game.fighters[0], { ...v1.game.fighters[0], level: 1, xp: 0 });
 });
 
-test("all 144 V2 plots survive save and load", () => {
+test("V2 migrates to V3 without regenerating fighter identity or base stats", () => {
+  const v2 = validV2Save();
+  v2.game.fighters[0].mutation = "ascended";
+  v2.game.ascensionPity = { potato: 2, carrot: 1, corn: 0 };
+  const original = structuredClone(v2.game.fighters[0]);
+  assert.equal(validateSproutSaveV2(v2), true);
+  const migrated = migrateV2ToV3(v2);
+  assert.ok(migrated);
+  assert.equal(migrated.version, 3);
+  assert.deepEqual(migrated.game.fighters[0], { ...original, level: 1, xp: 0 });
+  assert.deepEqual(migrated.game.ascensionPity, v2.game.ascensionPity);
+  assert.deepEqual(migrated.game.plots, v2.game.plots);
+  assert.deepEqual(migrated.world, v2.world);
+
+  const loaded = loadSproutSave(memoryStorage({ [SAVE_KEY]: JSON.stringify(v2) }));
+  assert.deepEqual(loaded, { status: "loaded", save: migrated });
+});
+
+test("all 144 V3 plots survive save and load", () => {
   const save = validSave();
   save.game.plots[100] = { id: 100, crop: "corn", plantedAt: 45_000 };
   const storage = memoryStorage();
@@ -97,7 +127,7 @@ test("all 144 V2 plots survive save and load", () => {
   assert.deepEqual(loaded.game.plots[100], save.game.plots[100]);
 });
 
-test("optional per-species Ascension pity round-trips in V2 and rejects corrupt counters", () => {
+test("optional per-species Ascension pity round-trips in V3 and rejects corrupt counters", () => {
   const save = validSave();
   save.game.ascensionPity = { potato: 2, carrot: 1, corn: 0 };
   const storage = memoryStorage();
@@ -108,7 +138,7 @@ test("optional per-species Ascension pity round-trips in V2 and rejects corrupt 
   save.game.ascensionPity.potato = -1;
   assert.equal(validateSproutSave(save), false);
   delete save.game.ascensionPity;
-  assert.equal(validateSproutSave(save), true, "old V2 saves remain valid");
+  assert.equal(validateSproutSave(save), true);
 });
 
 test("corrupted structures fall back without partial hydration", () => {

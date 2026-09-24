@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDiscord } from "@/hooks/useDiscord";
 import { fetchCloudSave, putCloudSave } from "@/lib/cloud-save-client";
 import { discordSaveKey, loadSproutSave, writeSproutSave } from "@/lib/save-storage";
-import type { SproutSavePayloadV2, SproutSaveV2 } from "@/lib/save-types";
+import type { SproutSavePayloadV3, SproutSaveV3 } from "@/lib/save-types";
 
 const LOCAL_DELAY_MS = 400;
 const CLOUD_DELAY_MS = 4000;
@@ -13,10 +13,10 @@ export type SyncState = "local-only" | "loading-cloud" | "synced" | "saving" | "
 
 export function useSproutPersistence() {
   const discord = useDiscord();
-  const [hydration, setHydration] = useState<{ complete: boolean; save: SproutSaveV2 | null }>({ complete: false, save: null });
+  const [hydration, setHydration] = useState<{ complete: boolean; save: SproutSaveV3 | null }>({ complete: false, save: null });
   const [syncState, setSyncState] = useState<SyncState>("local-only");
   const canWrite = useRef(false);
-  const latest = useRef<SproutSaveV2 | null>(null);
+  const latest = useRef<SproutSaveV3 | null>(null);
   const localTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudRevision = useRef<number | null>(null);
@@ -82,7 +82,7 @@ export function useSproutPersistence() {
       const userId = discord.user.id;
       localKey.current = discordSaveKey(userId);
       const owned = loadSproutSave(undefined, localKey.current);
-      if (owned.status === "future") localKey.current += ".v2-cache";
+      if (owned.status === "future") localKey.current += ".v3-cache";
       const owner = window.localStorage.getItem(LEGACY_OWNER_KEY);
       if (!owner) window.localStorage.setItem(LEGACY_OWNER_KEY, userId);
       const legacy = !owner || owner === userId ? loadSproutSave() : { status: "empty" as const, save: null };
@@ -146,9 +146,9 @@ export function useSproutPersistence() {
     };
   }, [flushLocal, flushCloud]);
 
-  const scheduleSave = useCallback((payload: SproutSavePayloadV2) => {
+  const scheduleSave = useCallback((payload: SproutSavePayloadV3) => {
     if (!canWrite.current) return;
-    latest.current = { version: 2, savedAt: Date.now(), ...payload };
+    latest.current = { version: 3, savedAt: Date.now(), ...payload };
     dirty.current = true;
     if (localTimer.current) clearTimeout(localTimer.current);
     localTimer.current = setTimeout(flushLocal, LOCAL_DELAY_MS);

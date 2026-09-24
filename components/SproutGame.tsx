@@ -11,7 +11,7 @@ import Battle from "@/components/Battle";
 import PixelWorld from "@/components/PixelWorld";
 import type { WorldNotification } from "@/components/WorldNotifications";
 import { FIRST_WORLD } from "@/lib/world-data";
-import type { SproutSavePayloadV2, SproutSaveV2 } from "@/lib/save-types";
+import type { SproutSavePayloadV3, SproutSaveV3 } from "@/lib/save-types";
 import type { WorldPoint } from "@/lib/world-types";
 
 export default function SproutGame() {
@@ -22,7 +22,7 @@ export default function SproutGame() {
   return <SproutGameSession initialSave={hydration.save} scheduleSave={scheduleSave} />;
 }
 
-function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV2 | null; scheduleSave: (payload: SproutSavePayloadV2) => void }) {
+function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV3 | null; scheduleSave: (payload: SproutSavePayloadV3) => void }) {
   const [notifications, setNotifications] = useState<WorldNotification[]>([]);
   const notify = useCallback((notification: Omit<WorldNotification, "id">) => {
     setNotifications((current) => [...current, { ...notification, id: crypto.randomUUID() }]);

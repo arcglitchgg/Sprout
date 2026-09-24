@@ -1,5 +1,6 @@
 import { FORMATION } from "@/lib/battle-data";
 import { crops, mutations, personalities } from "@/lib/game-data";
+import { getEffectiveFighter } from "@/lib/fighter-progression";
 import type { Fighter } from "@/lib/game-types";
 
 type Props = { fighters: Fighter[]; selected: string[]; onSelect: (ids: string[]) => void; locked: boolean };
@@ -15,11 +16,12 @@ export default function TeamSelector({ fighters, selected, onSelect, locked }: P
           {slot}
           <select className="mt-1 block w-full rounded-lg bg-[#fff8dc] p-2" value={selected[index]} onChange={(event) => onSelect(selected.map((id, i) => i === index ? event.target.value : id))}>
             <option value="">Choose a fighter</option>
-            {fighters.map((fighter, rosterIndex) => (
-              <option key={fighter.id} value={fighter.id} disabled={selected.includes(fighter.id) && selected[index] !== fighter.id}>
-                #{rosterIndex + 1} {mutations[fighter.mutation].name} {crops[fighter.crop].name} — {personalities[fighter.personality].name} (HP {fighter.hp}, ATK {fighter.attack}, DEF {fighter.defense}, SPD {fighter.speed})
-              </option>
-            ))}
+            {fighters.map((fighter, rosterIndex) => {
+              const effective = getEffectiveFighter(fighter);
+              return <option key={fighter.id} value={fighter.id} disabled={selected.includes(fighter.id) && selected[index] !== fighter.id}>
+                #{rosterIndex + 1} Lv. {fighter.level} {mutations[fighter.mutation].name} {crops[fighter.crop].name} — {personalities[fighter.personality].name} (HP {effective.hp}, ATK {effective.attack}, DEF {effective.defense}, SPD {effective.speed})
+              </option>;
+            })}
           </select>
         </label>
       ))}

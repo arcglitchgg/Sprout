@@ -1,7 +1,7 @@
 import "server-only";
 import { sessionUserFromRequest } from "@/lib/discord-session";
 import { readCloudSave, supabaseRequest } from "@/lib/supabase-admin";
-import { validateSproutSave } from "@/lib/save-storage";
+import { migrateSproutSave } from "@/lib/save-storage";
 import { buildDefenseSnapshot, calculateCombatPower, canChangeFriendship, canonicalFriendPair, publicProfile, sanitizeFarmSnapshot } from "@/lib/social";
 import type { DefenseFighter, DefenseTeam, FriendAction, FriendLists } from "@/lib/social-types";
 
@@ -91,14 +91,15 @@ export async function changeFriendship(actor: string, other: string, action: Fri
 export async function getDefenseTeam(actor: string): Promise<DefenseTeam> {
   const result = await database("rpc/get_sprout_defense", { p_owner: actor });
   if (!result || typeof result !== "object" || !("fighters" in result) || !("revision" in result)) throw new Error("Invalid defense response.");
-  const fighters: DefenseFighter[] = rows(result.fighters).map((f) => ({ slot: Number(f.slot), id: String(f.fighter_id), crop: f.crop as DefenseFighter["crop"], mutation: f.mutation as DefenseFighter["mutation"], personality: f.personality as DefenseFighter["personality"], hp: Number(f.hp), attack: Number(f.attack), defense: Number(f.defense), speed: Number(f.speed) }));
+  const fighters: DefenseFighter[] = rows(result.fighters).map((f) => ({ slot: Number(f.slot), id: String(f.fighter_id), crop: f.crop as DefenseFighter["crop"], mutation: f.mutation as DefenseFighter["mutation"], personality: f.personality as DefenseFighter["personality"], hp: Number(f.hp), attack: Number(f.attack), defense: Number(f.defense), speed: Number(f.speed), level: Number(f.level ?? 1), xp: Number(f.xp ?? 0) }));
   return { fighters, combatPower: calculateCombatPower(fighters), sourceSaveRevision: typeof result.revision === "number" ? result.revision : null };
 }
 
 export async function setDefenseTeam(actor: string, ids: unknown) {
   const saved = await readCloudSave(actor);
-  if (!saved || !validateSproutSave(saved.save)) throw new SocialError(409, "Wait for your farm to sync to the cloud, then try again.");
-  try { buildDefenseSnapshot(saved.save.game.fighters, ids); }
+  const save = saved ? migrateSproutSave(saved.save) : null;
+  if (!saved || !save) throw new SocialError(409, "Wait for your farm to sync to the cloud, then try again.");
+  try { buildDefenseSnapshot(save.game.fighters, ids); }
   catch (error) { throw new SocialError(400, error instanceof Error ? error.message : "Invalid fighters."); }
   // The RPC locks this same save revision, rechecks IDs, and copies stats from the stored JSON.
   checkMutation(await database("rpc/set_sprout_defense", { p_owner: actor, p_ids: ids, p_expected_revision: saved.revision }));
@@ -109,6 +110,7 @@ export async function getFriendFarm(actor: string, other: string) {
   try { canonicalFriendPair(actor, other); } catch { throw new SocialError(400, "Choose a friend's farm."); }
   const data = await database("rpc/get_sprout_friend_farm", { p_actor: actor, p_other: other });
   if (!data || typeof data !== "object" || !("profile" in data) || !("save" in data)) throw new SocialError(403, "Only accepted friends with a cloud save can be visited.");
-  if (!validateSproutSave(data.save) || !data.profile || typeof data.profile !== "object") throw new SocialError(503, "This farm cannot be loaded yet.");
-  return sanitizeFarmSnapshot(publicProfile(data.profile as Record<string, unknown>), data.save);
+  const save = migrateSproutSave(data.save);
+  if (!save || !data.profile || typeof data.profile !== "object") throw new SocialError(503, "This farm cannot be loaded yet.");
+  return sanitizeFarmSnapshot(publicProfile(data.profile as Record<string, unknown>), save);
 }
