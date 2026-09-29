@@ -46,3 +46,17 @@ export async function authenticateDiscordActivity({ clientId, sdk, exchangeCode,
     avatar: auth.user.avatar ?? null,
   };
 }
+
+export async function renewDiscordActivitySession({ clientId, sdk, exchangeCode, expectedUserId }: {
+  clientId: string;
+  sdk: DiscordSdkLike;
+  exchangeCode: (code: string) => Promise<DiscordExchange>;
+  expectedUserId: string;
+}) {
+  const { code } = await sdk.commands.authorize({ client_id: clientId, response_type: "code", prompt: "none", scope: ["identify"] });
+  const exchange = await exchangeCode(code);
+  if (!exchange.session) throw new Error("Sprout session renewal returned no session.");
+  const auth = await sdk.commands.authenticate({ access_token: exchange.accessToken });
+  if (!auth || auth.user.id !== expectedUserId) throw new Error("Discord identity changed during session renewal.");
+  return exchange.session;
+}

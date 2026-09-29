@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { authenticatedRequest } from "@/lib/session-client";
 
 export class RealtimeTokenError extends Error {
   constructor(readonly status: number) { super("Realtime token request failed."); }
@@ -12,7 +13,7 @@ export function createRealtimeClient(token: string) {
 }
 
 export async function requestRealtimeToken(session: string, signal?: AbortSignal): Promise<{ token: string; expiresAt: number }> {
-  const response = await fetch("/api/realtime/token", { method: "POST", headers: { Authorization: `Bearer ${session}` }, cache: "no-store", signal });
+  const response = await authenticatedRequest(session, (activeSession) => fetch("/api/realtime/token", { method: "POST", headers: { Authorization: `Bearer ${activeSession}` }, cache: "no-store", signal }));
   if (!response.ok) throw new RealtimeTokenError(response.status);
   const data: unknown = await response.json();
   if (!data || typeof data !== "object" || !("token" in data) || typeof data.token !== "string" || !("expiresAt" in data) || typeof data.expiresAt !== "number") throw new Error("Invalid Realtime token response.");

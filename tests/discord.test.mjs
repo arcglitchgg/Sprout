@@ -11,7 +11,7 @@ function load(name) {
   return loaded.exports;
 }
 
-const { authenticateDiscordActivity, isDiscordActivity } = load("@/lib/discord-client");
+const { authenticateDiscordActivity, isDiscordActivity, renewDiscordActivitySession } = load("@/lib/discord-client");
 
 test("standalone URLs are rejected before SDK construction", () => {
   assert.equal(isDiscordActivity(""), false);
@@ -69,4 +69,23 @@ test("structured token exchange passes only the Discord access token to the SDK"
   };
   await authenticateDiscordActivity({ clientId: "client-1", sdk, exchangeCode: async () => ({ accessToken: "access-1", session: "sprout-session" }) });
   assert.deepEqual(received, { access_token: "access-1" });
+});
+
+test("silent renewal reauthorizes the same Discord identity", async () => {
+  const sdk = {
+    ready: async () => {},
+    commands: {
+      authorize: async () => ({ code: "renew-code" }),
+      authenticate: async () => ({ user: { id: "user-1", username: "sprout-player" } }),
+    },
+  };
+  const session = await renewDiscordActivitySession({
+    clientId: "client-1", sdk, expectedUserId: "user-1",
+    exchangeCode: async (code) => ({ accessToken: `${code}-access`, session: "fresh-session" }),
+  });
+  assert.equal(session, "fresh-session");
+  await assert.rejects(() => renewDiscordActivitySession({
+    clientId: "client-1", sdk: { ...sdk, commands: { ...sdk.commands, authenticate: async () => ({ user: { id: "other", username: "other" } }) } },
+    expectedUserId: "user-1", exchangeCode: async () => ({ accessToken: "access", session: "session" }),
+  }), /identity changed/i);
 });

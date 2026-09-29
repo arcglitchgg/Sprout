@@ -5,6 +5,7 @@ import { useDiscord } from "@/hooks/useDiscord";
 import { fetchCloudSave, putCloudSave } from "@/lib/cloud-save-client";
 import { discordSaveKey, loadSproutSave, writeSproutSave } from "@/lib/save-storage";
 import type { SproutSavePayloadV3, SproutSaveV3 } from "@/lib/save-types";
+import { SessionDisconnectedError } from "@/lib/session-client";
 
 const LOCAL_DELAY_MS = 400;
 const CLOUD_DELAY_MS = 4000;
@@ -51,9 +52,10 @@ export function useSproutPersistence() {
         cloudRevision.current = result;
         setSyncState(dirty.current ? "unsynced" : "synced");
       }
-    } catch {
+    } catch (error) {
       dirty.current = true;
       setSyncState("unsynced");
+      if (error instanceof SessionDisconnectedError) cloudSession.current = null;
     } finally {
       inFlight.current = false;
       if (dirty.current && !blocked.current && cloudSession.current) cloudTimer.current = setTimeout(() => { void flushCloudRef.current(); }, CLOUD_DELAY_MS);
@@ -89,6 +91,7 @@ export function useSproutPersistence() {
       const local = owned.status === "loaded" || owned.status === "future" ? owned : legacy;
       canWrite.current = true;
       if (!discord.session) {
+        cloudSession.current = null;
         setHydration({ complete: true, save: local.status === "loaded" ? local.save : null });
         setSyncState("local-only");
         return;

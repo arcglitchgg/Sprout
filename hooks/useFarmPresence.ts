@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRealtimeClient, RealtimeTokenError, requestRealtimeToken } from "@/lib/realtime-client";
+import { logRealtimeTransportDisconnect, SessionDisconnectedError } from "@/lib/session-client";
 import { inspectRealtimeChannelError, realtimeErrorKind, realtimeStage, realtimeTransportEvent, safeRealtimeChannelError, safeRealtimeCloseReason, safeRealtimeHostname } from "@/lib/realtime-diagnostics";
 import { shouldSendMovement, createRemoteMovementStore, type RemoteMovementPacket } from "@/lib/remote-movement";
 import { CHALLENGE_MS, validChallengePacket, type ChallengeEvent, type ChallengePacket, type ChallengeState } from "@/lib/challenges";
@@ -231,6 +232,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
             }).catch((reason: unknown) => { if (!closed) realtimeStage("presence-track-failed", realtimeErrorKind(reason)); });
             if (latestLocal.current) sendRef.current?.(latestLocal.current, true);
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            logRealtimeTransportDisconnect();
             subscribed = false;
             challengeSend.current = null;
             reconcile(new Set());
@@ -242,6 +244,10 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         cleanup = () => { retired = true; subscribed = false; sendRef.current = null; challengeSend.current = null; realtimeStage("leaving-room"); void channel.untrack().catch(() => {}); void client.removeChannel(channel); };
       } catch (error) {
         if (!closed) {
+          if (error instanceof SessionDisconnectedError) {
+            reconcile(new Set());
+            return;
+          }
           realtimeStage(error instanceof RealtimeTokenError ? "token-fetch-failed" : realtimeErrorKind(error), error instanceof RealtimeTokenError ? error.status : undefined);
           reconcile(new Set());
           if (reconnectTimer === undefined) reconnectTimer = window.setTimeout(() => { reconnectTimer = undefined; void connect(); }, 1500);
