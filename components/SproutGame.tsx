@@ -48,27 +48,27 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
   }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, activeTeam, ascensionPity, dungeon, farmerWorld, scheduleSave]);
 
   return (
-    <main className="h-dvh overflow-hidden bg-[#171c19] p-2 text-[#2f3e2f] sm:p-3">
+    <main className="sprout-safe-screen h-dvh overflow-hidden bg-[#171c19] text-[#2f3e2f]">
       <div className="mx-auto flex h-full max-w-6xl flex-col">
-        <header className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-[#252d27] px-3 py-2 text-[#f4e8c1] shadow sm:px-4">
-          <div>
+        <header className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl bg-[#252d27] px-3 py-2 text-[#f4e8c1] shadow sm:flex-nowrap sm:gap-3 sm:px-4">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold sm:text-2xl">Sprout 🌱</h1>
             <p className="hidden text-xs sm:block">
               Grow. Collect. Mutate. Fight.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 max-[399px]:w-full max-[399px]:justify-between sm:gap-2">
             <button type="button" onClick={() => setMenuGuide(null)} className="rounded-lg border border-white/20 px-2 py-1 text-xs font-bold text-[#f4e8c1] hover:bg-white/10">Main Menu</button>
             {process.env.NODE_ENV === "development" && (
               <button type="button" onClick={() => setShowLegacyPanels(true)} className="rounded-lg border border-white/20 px-2 py-1 text-xs font-bold text-[#f4e8c1] hover:bg-white/10">
                 Debug panels
               </button>
             )}
-            <div className="rounded-lg bg-[#ffe28a] px-3 py-1.5 font-black tabular-nums text-[#4a2c12]">
+            <div className="rounded-lg bg-[#ffe28a] px-2 py-1.5 text-sm font-black tabular-nums text-[#4a2c12] sm:px-3 sm:text-base">
               🪙 {coins}
             </div>
-            <div className="rounded-lg bg-[#d9ed92] px-3 py-1.5 text-xs font-black tabular-nums text-[#304719] sm:text-sm">
+            <div className="rounded-lg bg-[#d9ed92] px-2 py-1.5 text-[11px] font-black tabular-nums text-[#304719] sm:px-3 sm:text-sm">
               Farm Lv {farmLevel} · {farmXp} XP
             </div>
           </div>

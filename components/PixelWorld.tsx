@@ -279,19 +279,21 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
 
   return (
     <section className="relative flex h-full min-h-0 flex-col">
-      <div className="mb-2 flex shrink-0 flex-wrap items-end justify-between gap-2 px-1 text-[#e8eadf]">
+      <div className="mb-2 flex shrink-0 flex-wrap items-end justify-between gap-1.5 px-1 text-[#e8eadf] max-[399px]:items-center">
         <div>
           <h2 className="max-w-64 truncate text-base font-bold sm:text-lg">{context.mode === "visiting" ? `${context.snapshot.owner.displayName ?? context.snapshot.owner.username}'s farm · Lv ${context.snapshot.owner.farmLevel}` : "Sprout Valley"}</h2>
           <p className="hidden text-xs text-[#b9c1b9] sm:block">{visiting ? "Visiting · View-only. Walk around or talk to the farm owner." : "Click or tap to walk. Visit the shops, plots, Dungeon, or Friends exit."}</p>
           {visitorCount > 0 && <p className="text-xs text-lime-300">{visitorCount} visitor{visitorCount === 1 ? "" : "s"} online</p>}
         </div>
-        {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-3 py-2 text-xs font-bold text-[#4a2c12]">Return Home</button>}
+        <div className="ml-auto flex items-center gap-1.5">
+        {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-2 py-1.5 text-xs font-bold text-[#4a2c12] sm:px-3 sm:py-2">Return Home</button>}
         <div className="flex rounded-lg border border-white/15 bg-[#252d27] p-0.5" aria-label="Camera mode">
           {(["overview", "follow"] as CameraMode[]).map((mode) => (
             <button key={mode} type="button" onClick={() => setCameraMode(mode)} aria-pressed={cameraMode === mode} className={`rounded-md px-2 py-1 text-xs font-bold capitalize ${cameraMode === mode ? "bg-[#ffe28a] text-[#4a2c12]" : "text-[#e8eadf] hover:bg-white/10"}`}>
               {mode}
             </button>
           ))}
+        </div>
         </div>
       </div>
       <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
@@ -300,7 +302,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
           <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} reconnectingIds={reconnectingIds} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
-        {!visiting && <div className="absolute bottom-2 left-2 right-2 z-40 flex flex-wrap items-end justify-between gap-2 pointer-events-none" aria-label="Farm quick actions">
+        {!visiting && <div className="sprout-world-bottom-controls pointer-events-none absolute z-40 flex flex-wrap items-end justify-between gap-1.5" aria-label="Farm quick actions">
           <div className="pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-lg border border-[#765438] bg-[#fff8dc]/95 p-1 text-[#2f3e2f] shadow-lg" aria-label="Selected planting crop">
             {(Object.keys(crops) as CropType[]).map((cropKey) => <button key={cropKey} type="button" onClick={() => setSelectedCrop(cropKey)} aria-pressed={selectedCrop === cropKey} className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${selectedCrop === cropKey ? "bg-[#4f772d] text-white" : "bg-white/70"}`}>
               {crops[cropKey].name} · {seeds[cropKey]}
@@ -311,7 +313,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       </div>
 
       {growingPlot?.crop && (
-        <div className="absolute bottom-5 left-1/2 z-50 flex w-[min(92%,360px)] -translate-x-1/2 items-center justify-between rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-sm text-[#2f3e2f] shadow-xl">
+        <div className="sprout-world-crop-status absolute left-1/2 z-50 flex w-[min(92%,360px)] -translate-x-1/2 items-center justify-between rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-3 text-sm text-[#2f3e2f] shadow-xl">
           <span><strong>{crops[growingPlot.crop].name}</strong> · {isReady(growingPlot, now) ? visiting ? "Ready · View-only" : "Ready — click the plot again" : `${getSecondsRemaining(growingPlot, now)}s remaining`}</span>
           <button type="button" onClick={closeInteraction} className="rounded px-2 font-bold" aria-label="Close crop status">×</button>
         </div>

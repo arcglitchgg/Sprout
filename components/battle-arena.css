@@ -1,5 +1,16 @@
-.battle-arena { container-type: size; }
-.battle-traveler { position: absolute; z-index: 20; margin: -50px 0 0 -40px; pointer-events: none; animation-fill-mode: both; }
+.battle-arena {
+  container-type: size;
+  height: clamp(300px, 55dvh, 440px);
+  --battle-fighter-width: 7rem;
+  --battle-hp-width: 6rem;
+  --battle-dialogue-width: 9rem;
+  --battle-traveler-width: 80px;
+  --battle-traveler-height: 100px;
+}
+.battle-fighter { width: var(--battle-fighter-width); }
+.battle-hp { width: var(--battle-hp-width); }
+.battle-speech { width: var(--battle-dialogue-width); max-width: calc(100cqw - 1rem); }
+.battle-traveler { position: absolute; z-index: 20; margin: calc(var(--battle-traveler-height) / -2) 0 0 calc(var(--battle-traveler-width) / -2); pointer-events: none; animation-fill-mode: both; }
 .battle-clean-sprite { image-rendering: pixelated; }
 .battle-basic { animation: battle-lunge 1300ms both; }
 .battle-heavy-slam { animation: battle-slam 1900ms both; }
@@ -21,3 +32,19 @@
 @keyframes battle-heavy-hit { 0%,35%,100% { filter: none; transform: translateX(0); } 45%,65% { filter: brightness(3); transform: translateX(9px) scaleY(.8); } 55%,75% { transform: translateX(-9px); } }
 @keyframes battle-bubble { 0% { opacity: 0; } 10%,85% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .battle-traveler { animation: none; display: none; } .battle-arena .opacity-0 { opacity: 1; } .battle-impact,.battle-impact-heavy,.battle-speech { animation: none; } .battle-ko { transition: none; } }
+
+@media (max-width: 420px), (max-height: 560px) {
+  .battle-arena {
+    --battle-fighter-width: 5rem;
+    --battle-hp-width: 4.25rem;
+    --battle-dialogue-width: 6.75rem;
+    --battle-traveler-width: 56px;
+    --battle-traveler-height: 76px;
+  }
+  .battle-fighter-position[data-side="player"][data-slot="1"],
+  .battle-fighter-position[data-side="player"][data-slot="2"] { left: 18% !important; }
+  .battle-fighter-position[data-side="enemy"][data-slot="1"],
+  .battle-fighter-position[data-side="enemy"][data-slot="2"] { left: 82% !important; }
+  .battle-side-labels { inset-inline: 0.5rem; font-size: 0.7rem; }
+  .battle-speech { padding: 0.35rem; font-size: 0.65rem; }
+}

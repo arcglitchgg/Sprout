@@ -39,9 +39,9 @@ export default function WorldDungeonOverlay({ fighters, activeTeam, progress, on
   }, [floor, onVictory]);
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#0b0f0c]/90 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Dungeon battle">
+    <div className="sprout-safe-overlay fixed inset-0 z-[70] overflow-y-auto bg-[#0b0f0c]/90" role="dialog" aria-modal="true" aria-label="Dungeon battle">
       <div className="mx-auto max-w-5xl">
-        <div className="sticky top-0 z-10 rounded-xl border border-white/15 bg-[#252d27] p-3 text-[#f4e8c1] shadow-xl">
+        <div className="sprout-safe-sticky-top sticky z-10 rounded-xl border border-white/15 bg-[#252d27] p-2 text-[#f4e8c1] shadow-xl sm:p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2"><h2 className="font-black">Dungeon Floor {floor} {boss ? "· BOSS" : ""}</h2><HelpButton topic="dungeon" onOpen={onHelp} className="border-white/30 bg-white/10 text-white" /></div>
@@ -49,9 +49,9 @@ export default function WorldDungeonOverlay({ fighters, activeTeam, progress, on
             </div>
             <button type="button" onClick={onClose} className="rounded-lg border border-white/20 px-4 py-2 font-bold">Return to world</button>
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 sm:mt-3 sm:flex-nowrap">
             <button type="button" disabled={floor <= 1} onClick={() => chooseFloor(floor - 1)} className="rounded-lg bg-[#f4e8c1] px-3 py-1.5 font-bold text-[#2f3e2f] disabled:opacity-35">Previous</button>
-            <select value={floor} onChange={(event) => chooseFloor(Number(event.target.value))} className="min-w-0 flex-1 rounded-lg bg-[#f4e8c1] p-2 font-bold text-[#2f3e2f]" aria-label="Dungeon floor">
+            <select value={floor} onChange={(event) => chooseFloor(Number(event.target.value))} className="min-w-32 flex-1 rounded-lg bg-[#f4e8c1] p-2 font-bold text-[#2f3e2f]" aria-label="Dungeon floor">
               {Array.from({ length: MAX_DUNGEON_FLOOR }, (_, index) => index + 1).map((value) => <option key={value} value={value} disabled={value > highestUnlocked}>Floor {value}{isDungeonBossFloor(value) ? " · Boss" : ""}{value > highestUnlocked ? " · Locked" : ""}</option>)}
             </select>
             <button type="button" disabled={floor >= highestUnlocked} onClick={() => chooseFloor(floor + 1)} className="rounded-lg bg-[#f4e8c1] px-3 py-1.5 font-bold text-[#2f3e2f] disabled:opacity-35">Next</button>

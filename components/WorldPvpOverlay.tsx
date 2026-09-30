@@ -62,10 +62,10 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
     onClose();
   }
 
-  return <div className="fixed inset-0 z-[80] overflow-y-auto bg-[#0b0f0c]/95 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Friendly PvP">
+  return <div className="sprout-safe-overlay fixed inset-0 z-[80] overflow-y-auto bg-[#0b0f0c]/95" role="dialog" aria-modal="true" aria-label="Friendly PvP">
     {ready && match?.challengerTeam && match.opponentTeam && match.battleId && match.battleSeed !== null
       ? <FriendlyBattle match={match} session={session} localId={localId} opponentName={opponentName} onReturn={onClose} />
-      : <div className="mx-auto max-w-xl rounded-xl bg-[#f4e8c1] p-4 text-[#2f3e2f]">
+      : <div className="mx-auto max-w-xl rounded-xl bg-[#f4e8c1] p-3 text-[#2f3e2f] sm:p-4">
         <h2 className="text-xl font-black">Friendly PvP vs {opponentName}</h2>
         <p className="text-sm">Choose three fighters. Both players must ready before battle starts.</p>
         {error && <p role="alert" className="mt-2 font-bold text-[#9b3d25]">{error}</p>}

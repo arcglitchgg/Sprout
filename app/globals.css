@@ -3,6 +3,34 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --sprout-safe-top: env(safe-area-inset-top, 0px);
+  --sprout-safe-right: env(safe-area-inset-right, 0px);
+  --sprout-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sprout-safe-left: env(safe-area-inset-left, 0px);
+}
+
+.sprout-safe-screen {
+  padding: max(0.5rem, var(--sprout-safe-top)) max(0.5rem, var(--sprout-safe-right)) max(0.5rem, var(--sprout-safe-bottom)) max(0.5rem, var(--sprout-safe-left));
+}
+.sprout-safe-overlay {
+  padding: max(0.5rem, var(--sprout-safe-top)) max(0.5rem, var(--sprout-safe-right)) max(0.5rem, var(--sprout-safe-bottom)) max(0.5rem, var(--sprout-safe-left));
+}
+.sprout-safe-top { top: max(0.75rem, var(--sprout-safe-top)); }
+.sprout-safe-right { right: max(0.5rem, var(--sprout-safe-right)); }
+.sprout-safe-bottom { bottom: max(0.5rem, var(--sprout-safe-bottom)); }
+.sprout-safe-sticky-top { top: var(--sprout-safe-top); }
+.sprout-world-bottom-controls {
+  left: max(0.5rem, var(--sprout-safe-left));
+  right: max(0.5rem, var(--sprout-safe-right));
+  bottom: max(0.5rem, var(--sprout-safe-bottom));
+}
+.sprout-world-crop-status {
+  bottom: calc(max(0.5rem, var(--sprout-safe-bottom)) + 3.75rem);
+}
+
+@media (min-width: 640px) {
+  .sprout-safe-screen { padding: max(0.75rem, var(--sprout-safe-top)) max(0.75rem, var(--sprout-safe-right)) max(0.75rem, var(--sprout-safe-bottom)) max(0.75rem, var(--sprout-safe-left)); }
+  .sprout-safe-overlay { padding: max(1.25rem, var(--sprout-safe-top)) max(1.25rem, var(--sprout-safe-right)) max(1.25rem, var(--sprout-safe-bottom)) max(1.25rem, var(--sprout-safe-left)); }
 }
 
 @theme inline {

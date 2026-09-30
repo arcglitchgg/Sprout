@@ -98,7 +98,7 @@ export default function DiscordProvider({ children }: { children: React.ReactNod
 
 function SessionDisconnectedModal() {
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4" role="alertdialog" aria-modal="true" aria-labelledby="session-disconnected-title">
+    <div className="sprout-safe-overlay fixed inset-0 z-[200] flex items-center justify-center bg-black/75" role="alertdialog" aria-modal="true" aria-labelledby="session-disconnected-title">
       <section className="max-w-md rounded-xl border-4 border-[#70452d] bg-[#fff0c2] p-6 text-center text-[#4a2c12] shadow-2xl">
         <h2 id="session-disconnected-title" className="text-xl font-black">Session Disconnected</h2>
         <p className="mt-3 font-semibold">Your Sprout session has expired. Reopen the Discord Activity to reconnect and continue playing.</p>
@@ -110,7 +110,7 @@ function SessionDisconnectedModal() {
 
 function DiscordDevelopmentIndicator({ state }: { state: DiscordRuntimeState }) {
   return (
-    <aside className="fixed bottom-2 right-2 z-[100] max-w-72 rounded-lg border border-white/20 bg-black/80 px-3 py-2 text-xs text-white shadow-lg">
+    <aside className="sprout-safe-bottom sprout-safe-right fixed z-[100] max-w-72 rounded-lg border border-white/20 bg-black/80 px-3 py-2 text-xs text-white shadow-lg">
       <div>Environment: {state.environment === "discord" ? "Discord" : "Standalone"}</div>
       <div>SDK ready: {state.ready ? "Yes" : "No"}</div>
       {state.user && <><div>User: {state.user.globalName ?? state.user.username}</div><div>ID: {state.user.id}</div></>}

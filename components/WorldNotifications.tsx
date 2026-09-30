@@ -32,7 +32,7 @@ function NotificationItem({ notification, onDismiss }: { notification: WorldNoti
 
 export default function WorldNotifications({ notifications, onDismiss }: { notifications: WorldNotification[]; onDismiss: (id: string) => void }) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-3 z-40 flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
+    <div className="sprout-safe-top pointer-events-none absolute left-1/2 z-40 flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
       {notifications.map((notification) => <NotificationItem key={notification.id} notification={notification} onDismiss={onDismiss} />)}
     </div>
   );

@@ -154,10 +154,10 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
     "--travel-y": `${position(to).y - position(from).y}cqh`,
   } as CSSProperties);
 
-  return <div className="battle-arena relative h-[440px] overflow-hidden rounded-2xl border-4 border-[#637a45] bg-[#b7cc8b] text-[#2f3e2f]" aria-label={`3 versus ${fighters.filter((fighter) => fighter.side === "enemy").length} battlefield`}>
-    <div className="absolute inset-x-4 top-3 flex justify-between text-sm font-bold"><span>{sideLabels[0]}</span><span>{sideLabels[1]}</span></div>
+  return <div className="battle-arena relative overflow-hidden rounded-2xl border-4 border-[#637a45] bg-[#b7cc8b] text-[#2f3e2f]" aria-label={`3 versus ${fighters.filter((fighter) => fighter.side === "enemy").length} battlefield`}>
+    <div className="battle-side-labels absolute inset-x-4 top-3 flex justify-between gap-2 text-sm font-bold"><span className="min-w-0 truncate">{sideLabels[0]}</span><span className="min-w-0 truncate text-right">{sideLabels[1]}</span></div>
     <div className="absolute inset-y-14 left-1/2 border-l-2 border-dashed border-[#637a45]/30" />
-    {fighters.map((fighter) => <div key={fighter.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${position(fighter).x}%`, top: `${position(fighter).y}%` }}>
+    {fighters.map((fighter) => <div key={fighter.id} data-side={fighter.side} data-slot={fighter.slot} className="battle-fighter-position absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${position(fighter).x}%`, top: `${position(fighter).y}%` }}>
       <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot} scale={fighter.visualScale}
         animationKey={active}
         dialogue={dialogue?.id === fighter.id ? dialogue.text : undefined}

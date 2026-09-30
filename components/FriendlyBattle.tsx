@@ -37,7 +37,7 @@ export default function FriendlyBattle({ match, session, localId, opponentName, 
       .catch((error: Error) => setFinalError(error.message))
       .finally(() => { finalizing.current = false; });
   }, [progress.complete, battle.status, session, match.id]);
-  return <div className="mx-auto max-w-5xl rounded-xl bg-[#f4e8c1] p-3 text-[#2f3e2f]">
+  return <div className="mx-auto max-w-5xl rounded-xl bg-[#f4e8c1] p-2 text-[#2f3e2f] sm:p-3">
     <h2 className="text-lg font-black">Friendly PvP vs {opponentName}</h2>
     <p className="text-sm">{match.challengerId === localId ? "Your team is on the left." : "Your team is on the right."} The winner earns one PvP Win.</p>
     <p role="status" className="my-2 font-bold">{final ? final.winnerId === null ? "Draw" : final.winnerId === localId ? "Victory" : "Defeat" : displayedResult}</p>

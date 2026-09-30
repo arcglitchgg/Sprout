@@ -8,7 +8,7 @@ export default function WorldSeedShopPanel({ coins, seeds, buySeed, onClose }: {
   onClose: () => void;
 }) {
   return (
-    <div className="absolute bottom-5 left-1/2 z-50 w-[min(94%,540px)] -translate-x-1/2 rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-4 text-[#2f3e2f] shadow-2xl">
+    <div className="sprout-safe-bottom absolute left-1/2 z-50 max-h-[calc(100%_-_1rem)] w-[min(94%,540px)] -translate-x-1/2 overflow-y-auto rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-4 text-[#2f3e2f] shadow-2xl">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div><h3 className="font-bold">Seed Shop</h3><p className="text-xs opacity-70">Buy seeds to plant on your farm.</p></div>
         <div className="flex items-center gap-2">
