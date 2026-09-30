@@ -10,6 +10,29 @@ export const CAMERA_MAX_ZOOM = 1.6;
 export const FOLLOW_ZOOM = 1.6;
 export const CAMERA_DRAG_THRESHOLD = 6;
 
+export function isCameraDrag(distance: number, pointerCount: number) {
+  return pointerCount > 1 || distance > CAMERA_DRAG_THRESHOLD;
+}
+
+export function createCameraClickGuard() {
+  const pointerIds = new Set<number>();
+  return {
+    mark(ids: Iterable<number>) {
+      for (const id of ids) pointerIds.add(id);
+    },
+    consume(pointerId?: number) {
+      if (pointerId !== undefined && !pointerIds.has(pointerId)) return false;
+      const id = pointerId ?? pointerIds.values().next().value;
+      if (id === undefined) return false;
+      pointerIds.delete(id);
+      return true;
+    },
+    clear(pointerId: number) {
+      pointerIds.delete(pointerId);
+    },
+  };
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }

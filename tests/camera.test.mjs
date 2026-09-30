@@ -7,7 +7,7 @@ const source = readFileSync("lib/world-camera.ts", "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const loaded = { exports: {} };
 new Function("require", "module", "exports", outputText)(() => ({}), loaded, loaded.exports);
-const { CAMERA_DRAG_THRESHOLD, CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM, cameraOffsetForAnchor, clampCameraZoom, clampCameraZoomForMode, getFollowCamera, getOverviewCamera, screenToCanonicalWorld } = loaded.exports;
+const { CAMERA_DRAG_THRESHOLD, CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM, cameraOffsetForAnchor, clampCameraZoom, clampCameraZoomForMode, createCameraClickGuard, getFollowCamera, getOverviewCamera, isCameraDrag, screenToCanonicalWorld } = loaded.exports;
 
 const world = { width: 1447, height: 1087 };
 
@@ -94,4 +94,29 @@ test("zoom anchor offset keeps the same canonical point beneath the pointer", ()
   const converted = screenToCanonicalWorld(zoomed, { x: 0, y: 0 }, screen);
   assert.ok(Math.abs(converted.x - anchor.x) < 0.0001);
   assert.ok(Math.abs(converted.y - anchor.y) < 0.0001);
+});
+
+test("plain desktop click and stationary mobile tap are not suppressed", () => {
+  const guard = createCameraClickGuard();
+  assert.equal(isCameraDrag(0, 1), false);
+  assert.equal(isCameraDrag(CAMERA_DRAG_THRESHOLD, 1), false);
+  assert.equal(guard.consume(1), false);
+  assert.equal(guard.consume(7), false);
+});
+
+test("drag beyond 6px suppresses only its resulting click", () => {
+  const guard = createCameraClickGuard();
+  assert.equal(isCameraDrag(CAMERA_DRAG_THRESHOLD + 0.01, 1), true);
+  guard.mark([1]);
+  assert.equal(guard.consume(1), true);
+  assert.equal(guard.consume(1), false);
+});
+
+test("pinch is treated as a gesture and cannot trigger movement", () => {
+  const guard = createCameraClickGuard();
+  assert.equal(isCameraDrag(0, 2), true);
+  guard.mark([3, 4]);
+  assert.equal(guard.consume(3), true);
+  assert.equal(guard.consume(4), true);
+  assert.equal(guard.consume(3), false);
 });

@@ -21,7 +21,7 @@ import { useFarmPresence } from "@/hooks/useFarmPresence";
 import { playerInRange, playerName } from "@/lib/challenges";
 import { socialRequest } from "@/lib/social-client";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
-import { CAMERA_DRAG_THRESHOLD, cameraOffsetForAnchor, clampCameraZoomForMode, getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
+import { cameraOffsetForAnchor, clampCameraZoomForMode, createCameraClickGuard, getFollowCamera, getOverviewCamera, isCameraDrag, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
 import type { GuideTopicId } from "@/lib/guide-data";
 import { getPlotUnlockLevel } from "@/lib/progression";
@@ -120,7 +120,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const [cameraPan, setCameraPan] = useState({ x: 0, y: 0 });
   const activePointers = useRef(new Map<number, WorldPoint>());
   const gesture = useRef<{ centroid: WorldPoint; distance: number; zoom: number; pan: WorldPoint; camera: { scale: number; x: number; y: number }; dragged: boolean } | null>(null);
-  const suppressMapClick = useRef(false);
+  const [cameraClickGuard] = useState(createCameraClickGuard);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -308,10 +308,13 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (modalOpen || event.button !== 0 || (event.target as HTMLElement).closest("[data-camera-ui]")) return;
-    if (!activePointers.current.size) suppressMapClick.current = false;
     activePointers.current.set(event.pointerId, localPointer(event));
-    event.currentTarget.setPointerCapture(event.pointerId);
     beginGesture();
+    if (activePointers.current.size > 1 && gesture.current) {
+      gesture.current.dragged = true;
+      cameraClickGuard.mark(activePointers.current.keys());
+      for (const pointerId of activePointers.current.keys()) event.currentTarget.setPointerCapture(pointerId);
+    }
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -321,10 +324,13 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
     if (!geometry) return;
     const start = gesture.current;
     const delta = { x: geometry.centroid.x - start.centroid.x, y: geometry.centroid.y - start.centroid.y };
-    if (Math.hypot(delta.x, delta.y) >= CAMERA_DRAG_THRESHOLD || activePointers.current.size > 1) start.dragged = true;
+    if (!start.dragged && isCameraDrag(Math.hypot(delta.x, delta.y), activePointers.current.size)) {
+      start.dragged = true;
+      cameraClickGuard.mark(activePointers.current.keys());
+      for (const pointerId of activePointers.current.keys()) event.currentTarget.setPointerCapture(pointerId);
+    }
     if (!start.dragged) return;
     event.preventDefault();
-    suppressMapClick.current = true;
     if (activePointers.current.size > 1 && start.distance > 0) {
       const nextZoom = clampCameraZoomForMode(cameraMode, start.zoom * geometry.distance / start.distance);
       const anchorWorld = {
@@ -342,6 +348,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
     activePointers.current.delete(event.pointerId);
+    window.setTimeout(() => cameraClickGuard.clear(event.pointerId), 0);
     if (activePointers.current.size) beginGesture();
     else gesture.current = null;
   }
@@ -388,7 +395,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
         </div>
         </div>
       </div>
-      <div ref={viewportRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onWheel={handleWheel} onClickCapture={(event) => { if (suppressMapClick.current) { event.preventDefault(); event.stopPropagation(); suppressMapClick.current = false; } }} className="relative min-h-0 w-full flex-1 touch-none overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
+      <div ref={viewportRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onWheel={handleWheel} onClickCapture={(event) => { const pointerId = (event.nativeEvent as PointerEvent).pointerId; if (cameraClickGuard.consume(pointerId)) { event.preventDefault(); event.stopPropagation(); } }} className="relative min-h-0 w-full flex-1 touch-none overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
           <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
           <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} reconnectingIds={reconnectingIds} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
