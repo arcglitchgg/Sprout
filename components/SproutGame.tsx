@@ -9,20 +9,22 @@ import CollectionBook from "@/components/CollectionBook";
 import FighterCard from "@/components/FighterCard";
 import Battle from "@/components/Battle";
 import PixelWorld from "@/components/PixelWorld";
+import MainMenu from "@/components/MainMenu";
 import type { WorldNotification } from "@/components/WorldNotifications";
 import { FIRST_WORLD } from "@/lib/world-data";
 import type { SproutSavePayloadV3, SproutSaveV3 } from "@/lib/save-types";
 import type { WorldPoint } from "@/lib/world-types";
+import type { GuideTopicId } from "@/lib/guide-data";
 
 export default function SproutGame() {
-  const { hydration, scheduleSave } = useSproutPersistence();
+  const { hydration, scheduleSave, syncState } = useSproutPersistence();
   if (!hydration.complete) {
     return <main className="flex min-h-screen items-center justify-center bg-[#171c19] font-bold text-[#f4e8c1]">Loading Sprout Valley…</main>;
   }
-  return <SproutGameSession initialSave={hydration.save} scheduleSave={scheduleSave} />;
+  return <SproutGameSession initialSave={hydration.save} scheduleSave={scheduleSave} syncState={syncState} />;
 }
 
-function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutSaveV3 | null; scheduleSave: (payload: SproutSavePayloadV3) => void }) {
+function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSave: SproutSaveV3 | null; scheduleSave: (payload: SproutSavePayloadV3) => void; syncState: ReturnType<typeof useSproutPersistence>["syncState"] }) {
   const [notifications, setNotifications] = useState<WorldNotification[]>([]);
   const notify = useCallback((notification: Omit<WorldNotification, "id">) => {
     setNotifications((current) => [...current, { ...notification, id: crypto.randomUUID() }]);
@@ -33,6 +35,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
   const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, activeTeam, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, setActiveTeam, awardDungeonVictory } = useGame(initialSave?.game, notify);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
+  const [menuGuide, setMenuGuide] = useState<GuideTopicId | null | undefined>(undefined);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
     setFarmerWorld({ farmerTile, facing });
   }, []);
@@ -56,6 +59,7 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
           </div>
 
           <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setMenuGuide(null)} className="rounded-lg border border-white/20 px-2 py-1 text-xs font-bold text-[#f4e8c1] hover:bg-white/10">Main Menu</button>
             {process.env.NODE_ENV === "development" && (
               <button type="button" onClick={() => setShowLegacyPanels(true)} className="rounded-lg border border-white/20 px-2 py-1 text-xs font-bold text-[#f4e8c1] hover:bg-white/10">
                 Debug panels
@@ -71,8 +75,10 @@ function SproutGameSession({ initialSave, scheduleSave }: { initialSave: SproutS
         </header>
 
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} activeTeam={activeTeam} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} releaseFighter={releaseFighter} setActiveTeam={setActiveTeam} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} />
+          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} activeTeam={activeTeam} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} releaseFighter={releaseFighter} setActiveTeam={setActiveTeam} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} onOpenGuide={(topic) => setMenuGuide(topic)} />
         </div>
+
+        {menuGuide !== undefined && <MainMenu fighters={fighters} activeTeam={activeTeam} farmLevel={farmLevel} syncState={syncState} initialGuide={menuGuide} onClose={() => setMenuGuide(undefined)} />}
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (
         <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#171c19]/95 p-3 sm:p-6">

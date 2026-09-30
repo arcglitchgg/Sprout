@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Battle from "@/components/Battle";
+import HelpButton from "@/components/HelpButton";
 import { VICTORY_COINS } from "@/lib/battle-data";
 import { createDungeonEnemyTeam, getDungeonFloorXp, getHighestUnlockedDungeonFloor, isDungeonBossFloor, MAX_DUNGEON_FLOOR } from "@/lib/dungeon";
 import { crops, personalities } from "@/lib/game-data";
@@ -9,12 +10,14 @@ import type { BattleState } from "@/lib/battle-types";
 import type { DungeonVictoryReward } from "@/lib/dungeon";
 import type { ActiveTeam, Fighter } from "@/lib/game-types";
 import type { DungeonProgress } from "@/lib/save-types";
+import type { GuideTopicId } from "@/lib/guide-data";
 
-export default function WorldDungeonOverlay({ fighters, activeTeam, progress, onVictory, onClose }: {
+export default function WorldDungeonOverlay({ fighters, activeTeam, progress, onVictory, onHelp, onClose }: {
   fighters: Fighter[];
   activeTeam: ActiveTeam;
   progress: DungeonProgress;
   onVictory: (result: BattleState, floor: number) => DungeonVictoryReward | null;
+  onHelp: (topic: GuideTopicId) => void;
   onClose: () => void;
 }) {
   const highestUnlocked = getHighestUnlockedDungeonFloor(progress);
@@ -41,7 +44,7 @@ export default function WorldDungeonOverlay({ fighters, activeTeam, progress, on
         <div className="sticky top-0 z-10 rounded-xl border border-white/15 bg-[#252d27] p-3 text-[#f4e8c1] shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="font-black">Dungeon Floor {floor} {boss ? "· BOSS" : ""}</h2>
+              <div className="flex items-center gap-2"><h2 className="font-black">Dungeon Floor {floor} {boss ? "· BOSS" : ""}</h2><HelpButton topic="dungeon" onOpen={onHelp} className="border-white/30 bg-white/10 text-white" /></div>
               <p className="text-xs opacity-80">Highest unlocked: {highestUnlocked} · Enemies: {enemyTeam.length} · Reward: {xp} XP per fighter</p>
             </div>
             <button type="button" onClick={onClose} className="rounded-lg border border-white/20 px-4 py-2 font-bold">Return to world</button>

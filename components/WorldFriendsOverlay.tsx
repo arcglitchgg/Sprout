@@ -5,15 +5,18 @@ import { useDiscord } from "@/hooks/useDiscord";
 import { socialRequest } from "@/lib/social-client";
 import FighterCard from "@/components/FighterCard";
 import NeighborhoodRanks from "@/components/NeighborhoodRanks";
+import HelpButton from "@/components/HelpButton";
 import type { Fighter } from "@/lib/game-types";
 import type { DefenseTeam, FriendAction, FriendFarmSnapshot, FriendLists, SproutProfile } from "@/lib/social-types";
 import { getRealtimeDiagnostics, subscribeRealtimeDiagnostics, type RealtimeErrorShape } from "@/lib/realtime-diagnostics";
+import type { GuideTopicId } from "@/lib/guide-data";
 
 const button = "rounded-lg bg-[#4f772d] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40";
 type Tab = "friends" | "requests" | "search" | "defense" | "rankings";
 
-export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presenceOwnerId, presenceRole, presenceMemberCount }: {
+export default function WorldFriendsOverlay({ fighters, onVisit, onClose, onHelp, presenceOwnerId, presenceRole, presenceMemberCount }: {
   fighters: Fighter[]; onVisit: (snapshot: FriendFarmSnapshot) => void; onClose: () => void;
+  onHelp: (topic: GuideTopicId) => void;
   presenceOwnerId: string | null; presenceRole: "owner" | "visitor"; presenceMemberCount: number;
 }) {
   const { session, user } = useDiscord();
@@ -126,6 +129,7 @@ export default function WorldFriendsOverlay({ fighters, onVisit, onClose, presen
             })}
           </>}
           {tab === "defense" && <>
+            <div className="flex items-center gap-2"><h3 className="font-black">Defense Team</h3><HelpButton topic="defense-team" onOpen={onHelp} /></div>
             <p className="text-sm">Select up to 3 fighters in formation order. Defense uses your latest cloud-saved roster. Challenges will require all 3.</p>
             <div className="flex flex-wrap items-center gap-3"><strong>{selected.length} / 3 selected</strong><span className="text-sm">Saved CP: {defense?.combatPower ?? "—"}</span><button type="button" className="text-sm underline" disabled={busy || defense === null} onClick={() => setSelectedIds([])}>Clear</button></div>
             <button type="button" className={button} disabled={busy || defense === null} onClick={() => void run(async () => { const team = await socialRequest<DefenseTeam>(session, "/api/defense-team", "PUT", { fighterIds: selected }); if (mounted.current) { setDefense(team); setSelectedIds(team.fighters.map((f) => f.id)); setMessage("Defense team saved."); } })}>Save Defense</button>
