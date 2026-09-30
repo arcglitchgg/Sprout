@@ -155,7 +155,7 @@ test("Protective intercepts a species skill once, uses its own DEF, and refreshe
   assert.equal(chosen.decisions[0].intendedTargetId, "enemy-carrot");
   assert.equal(chosen.decisions[0].actualTargetId, "enemy-potato");
   assert.equal(chosen.combatants[4].currentHp, 10);
-  assert.equal(chosen.combatants[3].currentHp, 130 - Math.round((20 + 20 * 0.35) * 1.25 * 100 / 135));
+  assert.equal(chosen.combatants[3].currentHp, 170 - Math.round((20 + 20 * 0.35) * 1.25 * 100 / 135));
   assert.equal(chosen.combatants[3].guardReady, false);
   const later = advanceBattle(chosen, 4000);
   assert.equal(later.combatants[4].currentHp, 0);

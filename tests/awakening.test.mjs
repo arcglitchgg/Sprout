@@ -16,6 +16,7 @@ function load(name) {
 
 const { AWAKENING_COSTS, awakenHarvestedCrop } = load("@/lib/awakening");
 const { createHarvestedCrop } = load("@/lib/inventory");
+const { generateFighter } = load("@/lib/fighters");
 
 const fixedFighter = (source) => ({ id: "fighter-new", crop: source.crop, mutation: source.mutation, personality: "clever", hp: 100, attack: 20, defense: 20, speed: 20 });
 
@@ -57,4 +58,12 @@ test("fighter generation failure leaves the source state untouched", () => {
   const items = [createHarvestedCrop("potato", "large", 1, "crop")];
   assert.throws(() => awakenHarvestedCrop(items, [], 100, "crop", () => { throw new Error("generation failed"); }));
   assert.equal(items.length, 1);
+});
+
+test("Awakening creates a fighter with one permanent natural-stat roll", () => {
+  const items = [createHarvestedCrop("carrot", "normal", 1, "crop")];
+  const values = [0, 0.999999, 0.5, 0.999999, 0.6];
+  const result = awakenHarvestedCrop(items, [], 100, "crop", (source) => generateFighter(source, () => values.shift()));
+  assert.equal(result.awakened, true);
+  assert.deepEqual({ hp: result.fighter.hp, attack: result.fighter.attack, defense: result.fighter.defense, speed: result.fighter.speed }, { hp: 120, attack: 28, defense: 20, speed: 39 });
 });

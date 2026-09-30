@@ -16,6 +16,16 @@ export const GUIDE_TOPICS = [
 export type GuideTopicId = (typeof GUIDE_TOPICS)[number]["id"];
 
 export const PATCH_NOTES = [{
+  version: "Fighter Growth & Individuality",
+  date: "September 2026",
+  bullets: [
+    "Increased species HP so battles have more room for personality and tactics",
+    "Newly awakened and fused fighters now receive permanent natural stat variation",
+    "Species-specific growth ceilings preserve each fighter's long-term identity",
+    "Potato remains tank-focused, Carrot remains Speed-focused, and Corn remains ATK-focused",
+    "Existing fighters keep their stored natural stats",
+  ],
+}, {
   version: "Combat Identity Rebalance",
   date: "September 2026",
   bullets: [

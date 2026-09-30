@@ -1,7 +1,32 @@
 import { FIGHTER_RARITY_MULTIPLIERS, personalities } from "@/lib/game-data";
 import type { CropType, Fighter, MutationType, PersonalityType } from "@/lib/game-types";
 
+type FighterStat = "hp" | "attack" | "defense" | "speed";
+type StatRange = { min: number; max: number };
+
+export const FIGHTER_SPECIES_BASE_STATS: Record<CropType, Record<FighterStat, number>> = {
+  potato: { hp: 170, attack: 20, defense: 30, speed: 20 },
+  carrot: { hp: 125, attack: 25, defense: 20, speed: 35 },
+  corn: { hp: 125, attack: 35, defense: 20, speed: 20 },
+};
+
+export const FIGHTER_NATURAL_STAT_RANGES: Record<CropType, Record<FighterStat, StatRange>> = {
+  potato: { hp: { min: 155, max: 185 }, attack: { min: 19, max: 21 }, defense: { min: 26, max: 34 }, speed: { min: 19, max: 21 } },
+  carrot: { hp: { min: 120, max: 130 }, attack: { min: 23, max: 28 }, defense: { min: 19, max: 21 }, speed: { min: 31, max: 39 } },
+  corn: { hp: { min: 120, max: 130 }, attack: { min: 31, max: 39 }, defense: { min: 19, max: 21 }, speed: { min: 19, max: 22 } },
+};
+
+function rollStat(range: StatRange, random: () => number) {
+  return range.min + Math.floor(random() * (range.max - range.min + 1));
+}
+
 export function generateFighter(source: { crop: CropType; mutation: MutationType }, random: () => number = Math.random): Fighter {
+  const ranges = FIGHTER_NATURAL_STAT_RANGES[source.crop];
+  let hp = rollStat(ranges.hp, random);
+  let attack = rollStat(ranges.attack, random);
+  let defense = rollStat(ranges.defense, random);
+  let speed = rollStat(ranges.speed, random);
+
   const personalityKeys = Object.keys(
     personalities
   ) as PersonalityType[];
@@ -10,26 +35,6 @@ export function generateFighter(source: { crop: CropType; mutation: MutationType
     personalityKeys[
     Math.floor(random() * personalityKeys.length)
     ];
-
-  let hp = 100;
-  let attack = 20;
-  let defense = 20;
-  let speed = 20;
-
-  // Species identity
-  if (source.crop === "potato") {
-    hp += 30;
-    defense += 10;
-  }
-
-  if (source.crop === "carrot") {
-    speed += 15;
-    attack += 5;
-  }
-
-  if (source.crop === "corn") {
-    attack += 15;
-  }
 
   // Mutation strength
   const mutationMultiplier = FIGHTER_RARITY_MULTIPLIERS[source.mutation];

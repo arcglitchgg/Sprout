@@ -14,8 +14,8 @@ function load(name) {
   return loaded.exports;
 }
 
-const { awardFighterXp, getEffectiveFighter, getFighterLevelMultiplier, getLevelFromXp, getXpRequiredForNextLevel } = load("@/lib/fighter-progression");
-const { generateFighter } = load("@/lib/fighters");
+const { awardFighterXp, FIGHTER_GROWTH_CEILINGS, getEffectiveFighter, getFighterStatMultiplier, getLevelFromXp, getXpRequiredForNextLevel } = load("@/lib/fighter-progression");
+const { FIGHTER_NATURAL_STAT_RANGES, generateFighter } = load("@/lib/fighters");
 
 const fighter = { id: "base", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20, level: 1, xp: 0 };
 
@@ -35,17 +35,40 @@ test("cumulative XP supports multi-level gains and progression beyond level 10",
   assert.equal(fighter.level, 1, "base fighter is not mutated");
 });
 
-test("level scaling is deterministic and leaves generated base stats stable", () => {
-  assert.equal(getFighterLevelMultiplier(1), 1);
-  assert.equal(getFighterLevelMultiplier(5), 1.12);
-  assert.equal(getFighterLevelMultiplier(10), 1.27);
-  assert.equal(getFighterLevelMultiplier(20), 1.57);
+test("species/stat growth is deterministic, monotonic, and starts near three percent per level", () => {
+  for (const crop of ["potato", "carrot", "corn"]) for (const stat of ["hp", "attack", "defense", "speed"]) {
+    const stored = stat === "speed" ? 20 : 100;
+    const values = [1, 2, 5, 20, 100, 1000].map((level) => getFighterStatMultiplier(crop, stat, level, stored));
+    assert.equal(values[0], 1);
+    assert.ok(values[1] > 1.029 && values[1] < 1.03);
+    assert.ok(values.every((value, index) => index === 0 || value >= values[index - 1]));
+    assert.ok(values.every((value) => value <= FIGHTER_GROWTH_CEILINGS[crop][stat]));
+  }
   const leveled = { ...fighter, level: 5, xp: 280 };
   const first = getEffectiveFighter(leveled);
   const second = getEffectiveFighter(leveled);
   assert.deepEqual(first, second);
-  assert.deepEqual({ hp: first.hp, attack: first.attack, defense: first.defense, speed: first.speed }, { hp: 146, attack: 22, defense: 39, speed: 22 });
   assert.deepEqual({ hp: leveled.hp, attack: leveled.attack, defense: leveled.defense, speed: leveled.speed }, { hp: 130, attack: 20, defense: 35, speed: 20 });
+});
+
+test("species ceilings retain tank, Speed, and ATK identities", () => {
+  const level = 10000;
+  const potato = getEffectiveFighter({ ...fighter, crop: "potato", hp: 185, attack: 21, defense: 34, speed: 21, level });
+  const carrot = getEffectiveFighter({ ...fighter, crop: "carrot", hp: 130, attack: 28, defense: 21, speed: 39, level });
+  const corn = getEffectiveFighter({ ...fighter, crop: "corn", hp: 130, attack: 39, defense: 21, speed: 22, level });
+  assert.ok(potato.hp > carrot.hp && potato.hp > corn.hp);
+  assert.ok(potato.defense > carrot.defense && potato.defense > corn.defense);
+  assert.ok(carrot.speed > potato.speed && carrot.speed > corn.speed);
+  assert.ok(carrot.speed <= 100);
+  assert.ok(corn.attack > potato.attack && corn.attack > carrot.attack);
+});
+
+test("high natural rolls remain stronger at high levels", () => {
+  for (const crop of ["potato", "carrot", "corn"]) for (const stat of ["hp", "attack", "defense", "speed"]) {
+    const range = FIGHTER_NATURAL_STAT_RANGES[crop][stat];
+    const base = { ...fighter, crop, [stat]: range.min, level: 1000 };
+    assert.ok(getEffectiveFighter({ ...base, [stat]: range.max })[stat] > getEffectiveFighter(base)[stat]);
+  }
 });
 
 test("newly generated fighters start at level 1 with zero XP", () => {

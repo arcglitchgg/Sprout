@@ -76,6 +76,16 @@ test("valid durable progress round-trips without transient state", () => {
   assert.equal("battle" in JSON.parse(storage.getItem(SAVE_KEY)), false);
 });
 
+test("stored natural fighter stats round-trip exactly and are never rerolled", () => {
+  const save = validSave();
+  Object.assign(save.game.fighters[0], { hp: 183, attack: 21, defense: 33, speed: 19, level: 8, xp: 1080 });
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  const loaded = loadSproutSave(storage);
+  assert.equal(loaded.status, "loaded");
+  assert.deepEqual(loaded.save.game.fighters[0], save.game.fighters[0]);
+});
+
 test("old V3 fighters default unlocked and lock state persists", () => {
   const old = validSave();
   delete old.game.fighters[0].locked;

@@ -40,9 +40,9 @@ test("rejects mixed species, mixed rarities, and Ascended inputs", () => {
 test("Normal fusion preserves the strict 0.70 boundary", () => {
   for (const [roll, expected] of [[0, "normal"], [0.699999, "normal"], [0.70, "large"], [0.99, "large"]]) {
     let calls = 0;
-    const fusion = fuseFighters(roster(), ids, () => [roll, 0.2][calls++]);
+    const fusion = fuseFighters(roster(), ids, () => [roll, 0.2, 0.2, 0.2, 0.2, 0.2][calls++]);
     assert.equal(fusion.result.mutation, expected);
-    assert.equal(calls, 2);
+    assert.equal(calls, 6);
   }
 });
 
@@ -51,9 +51,9 @@ test("Large, Golden, and Prismatic upgrades use centralized strict boundaries an
     const team = ids.map((id) => fighter(id, "carrot", input));
     for (const [roll, expected] of [[0, upgraded], [chance - 0.000001, upgraded], [chance, input], [0.99, input]]) {
       let calls = 0;
-      const fusion = fuseFighters(team, ids, () => [roll, 0.2][calls++]);
+      const fusion = fuseFighters(team, ids, () => [roll, 0.2, 0.2, 0.2, 0.2, 0.2][calls++]);
       assert.equal(fusion.result.mutation, expected, `${input} roll ${roll}`);
-      assert.equal(calls, 2);
+      assert.equal(calls, 6);
       assert.equal(fusion.remaining.length, 1);
       assert.equal(fusion.pity.carrot, input === "prismatic" && expected === input ? 1 : 0);
     }
@@ -72,7 +72,7 @@ test("third Prismatic attempt guarantees Ascended, resets only that species, and
   let calls = 0;
   const third = fuseFighters(team, ids, () => { calls++; return 0.99; }, second.pity);
   assert.equal(third.result.mutation, "ascended");
-  assert.equal(calls, 1, "hard pity skips the success roll but still rolls personality");
+  assert.equal(calls, 5, "hard pity skips the success roll but still rolls four natural stats and personality");
   assert.deepEqual(third.pity, { potato: 0, carrot: 1, corn: 0 });
   assert.equal(fuseFighters(third.remaining, ids, () => 0, third.pity), null);
   assert.deepEqual(third.pity, { potato: 0, carrot: 1, corn: 0 });
@@ -95,7 +95,7 @@ test("fusion creates a fresh ID, personality, and calculated stats; consumes onl
   assert.ok(fusion);
   assert.equal(fusion.result.crop, "potato");
   assert.equal(fusion.result.personality, "protective");
-  assert.deepEqual([fusion.result.hp, fusion.result.attack, fusion.result.defense, fusion.result.speed], [130, 20, 35, 20]);
+  assert.deepEqual([fusion.result.hp, fusion.result.attack, fusion.result.defense, fusion.result.speed], [161, 19, 31, 19]);
   assert.ok(!before.some((entry) => entry.id === fusion.result.id));
   assert.deepEqual(fusion.remaining.map((entry) => entry.id), ["unrelated", fusion.result.id]);
   assert.deepEqual(before.map((entry) => entry.id), [...ids, "unrelated"]);
@@ -110,7 +110,7 @@ test("Save V3 round-trips the fused roster without a schema change", () => {
     game: {
       coins: 100, farmXp: 42, seeds: { potato: 3, carrot: 0, corn: 0 }, selectedCrop: "potato",
       plots: Array.from({ length: 144 }, (_, id) => ({ id, crop: null, plantedAt: null })),
-      harvestedCrops: [], collection: [], fighters: fusion.remaining, ascensionPity: { potato: 2, carrot: 0, corn: 0 },
+      harvestedCrops: [], collection: [], fighters: fusion.remaining, ascensionPity: { potato: 2, carrot: 0, corn: 0 }, activeTeam: [null, null, null],
     },
     world: { farmerTile: FIRST_WORLD.start, facing: "right" },
   };
