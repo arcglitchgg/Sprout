@@ -96,6 +96,7 @@ test("fusion creates a fresh ID, personality, and calculated stats; consumes onl
   assert.equal(fusion.result.crop, "potato");
   assert.equal(fusion.result.personality, "protective");
   assert.deepEqual([fusion.result.hp, fusion.result.attack, fusion.result.defense, fusion.result.speed], [161, 19, 31, 19]);
+  assert.deepEqual(fusion.result.naturalStats, { hp: 161, attack: 19, defense: 27, speed: 19 });
   assert.ok(!before.some((entry) => entry.id === fusion.result.id));
   assert.deepEqual(fusion.remaining.map((entry) => entry.id), ["unrelated", fusion.result.id]);
   assert.deepEqual(before.map((entry) => entry.id), [...ids, "unrelated"]);

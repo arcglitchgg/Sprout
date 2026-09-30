@@ -66,4 +66,5 @@ test("Awakening creates a fighter with one permanent natural-stat roll", () => {
   const result = awakenHarvestedCrop(items, [], 100, "crop", (source) => generateFighter(source, () => values.shift()));
   assert.equal(result.awakened, true);
   assert.deepEqual({ hp: result.fighter.hp, attack: result.fighter.attack, defense: result.fighter.defense, speed: result.fighter.speed }, { hp: 120, attack: 28, defense: 20, speed: 39 });
+  assert.deepEqual(result.fighter.naturalStats, { hp: 120, attack: 28, defense: 20, speed: 39 });
 });

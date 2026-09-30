@@ -86,6 +86,19 @@ test("stored natural fighter stats round-trip exactly and are never rerolled", (
   assert.deepEqual(loaded.save.game.fighters[0], save.game.fighters[0]);
 });
 
+test("optional natural roll metadata round-trips while legacy fighters remain valid", () => {
+  const save = validSave();
+  save.game.fighters[0].naturalStats = { hp: 185, attack: 21, defense: 34, speed: 21 };
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  assert.deepEqual(loadSproutSave(storage).save.game.fighters[0].naturalStats, save.game.fighters[0].naturalStats);
+  delete save.game.fighters[0].naturalStats;
+  assert.equal(validateSproutSave(save), true);
+  const invalid = structuredClone(save);
+  invalid.game.fighters[0].naturalStats = { hp: 186, attack: 21, defense: 34, speed: 21 };
+  assert.equal(validateSproutSave(invalid), false);
+});
+
 test("old V3 fighters default unlocked and lock state persists", () => {
   const old = validSave();
   delete old.game.fighters[0].locked;

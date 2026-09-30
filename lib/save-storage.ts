@@ -1,6 +1,7 @@
 import { FIRST_WORLD } from "@/lib/world-data";
 import { TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { getLevelFromXp } from "@/lib/fighter-progression";
+import { FIGHTER_NATURAL_STAT_RANGES } from "@/lib/fighters";
 import { normalizeActiveTeam } from "@/lib/team-selection";
 import type { CropType, HarvestMutationType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
 import type { SproutSaveV1, SproutSaveV2, SproutSaveV3 } from "@/lib/save-types";
@@ -25,6 +26,8 @@ const isCrop = (value: unknown): value is CropType => crops.includes(value as Cr
 const isHarvestMutation = (value: unknown): value is HarvestMutationType => harvestMutations.includes(value as HarvestMutationType);
 const isFighterMutation = (value: unknown): value is MutationType => fighterMutations.includes(value as MutationType);
 const isPersonality = (value: unknown): value is PersonalityType => personalities.includes(value as PersonalityType);
+const validNaturalStats = (value: unknown, crop: CropType) => isRecord(value) && (["hp", "attack", "defense", "speed"] as const).every((stat) =>
+  Number.isInteger(value[stat]) && (value[stat] as number) >= FIGHTER_NATURAL_STAT_RANGES[crop][stat].min && (value[stat] as number) <= FIGHTER_NATURAL_STAT_RANGES[crop][stat].max);
 const validAscensionPity = (value: unknown) => isRecord(value) && crops.every((crop) =>
   Number.isInteger(value[crop]) && (value[crop] as number) >= 0 && (value[crop] as number) < 3);
 const validDungeonProgress = (value: unknown) => {
@@ -78,6 +81,7 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   for (const fighter of game.fighters) {
     if (!isRecord(fighter) || !isId(fighter.id) || fighterIds.has(fighter.id) || !isCrop(fighter.crop) || !isFighterMutation(fighter.mutation) || !isPersonality(fighter.personality)) return false;
     if (![fighter.hp, fighter.attack, fighter.defense, fighter.speed].every(isFiniteNonnegative)) return false;
+    if (fighter.naturalStats !== undefined && !validNaturalStats(fighter.naturalStats, fighter.crop as CropType)) return false;
     if (fighter.locked !== undefined && typeof fighter.locked !== "boolean") return false;
     if (requireFighterProgression && (!Number.isSafeInteger(fighter.level) || (fighter.level as number) < 1 || !Number.isSafeInteger(fighter.xp) || (fighter.xp as number) < 0 || fighter.level !== getLevelFromXp(fighter.xp as number))) return false;
     fighterIds.add(fighter.id);
