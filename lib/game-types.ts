@@ -50,10 +50,11 @@ export type Fighter = {
   speed: number;
   level: number;
   xp: number;
+  locked: boolean;
   visualScale?: number;
 };
 
-export type LegacyFighter = Omit<Fighter, "level" | "xp">;
+export type LegacyFighter = Omit<Fighter, "level" | "xp" | "locked">;
 
 export type HarvestedCrop = {
   id: string;

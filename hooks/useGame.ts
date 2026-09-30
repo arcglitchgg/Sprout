@@ -11,6 +11,7 @@ import { fuseFighters as createFusion, INITIAL_ASCENSION_PITY } from "@/lib/fusi
 import { harvestPlot, harvestReadyPlots, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
+import { releaseRosterFighter, setRosterFighterLocked } from "@/lib/fighter-roster";
 import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
 import type { SproutGameSaveV3 } from "@/lib/save-types";
 import type { WorldNotification } from "@/components/WorldNotifications";
@@ -208,5 +209,21 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     return fusion.result;
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, awardDungeonVictory };
+  function setFighterLocked(fighterId: string, locked: boolean) {
+    const next = setRosterFighterLocked(fightersRef.current, fighterId, locked);
+    if (!next) return false;
+    fightersRef.current = next;
+    setFighters(next);
+    return true;
+  }
+
+  function releaseFighter(fighterId: string) {
+    const result = releaseRosterFighter(fightersRef.current, fighterId);
+    if (!result) return false;
+    fightersRef.current = result.remaining;
+    setFighters(result.remaining);
+    return true;
+  }
+
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, awardDungeonVictory };
 }

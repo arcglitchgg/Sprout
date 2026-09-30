@@ -19,7 +19,7 @@ const { fuseFighters, getFusionEligibility, INITIAL_ASCENSION_PITY } = load("@/l
 const { retainExistingTeamIds } = load("@/lib/team-selection");
 const { SAVE_KEY, loadSproutSave, writeSproutSave } = load("@/lib/save-storage");
 const { FIRST_WORLD } = load("@/lib/world-data");
-const fighter = (id, crop = "potato", mutation = "normal") => ({ id, crop, mutation, personality: "angry", hp: 1, attack: 1, defense: 1, speed: 1 });
+const fighter = (id, crop = "potato", mutation = "normal", locked = false) => ({ id, crop, mutation, personality: "angry", hp: 1, attack: 1, defense: 1, speed: 1, level: 1, xp: 0, locked });
 const roster = () => [fighter("a"), fighter("b"), fighter("c"), fighter("d"), fighter("unrelated", "corn")];
 const ids = ["a", "b", "c", "d"];
 
@@ -103,10 +103,10 @@ test("fusion creates a fresh ID, personality, and calculated stats; consumes onl
   assert.equal(getFusionEligibility(fusion.remaining, ids).valid, false);
 });
 
-test("Save V2 round-trips the fused roster without a schema change", () => {
+test("Save V3 round-trips the fused roster without a schema change", () => {
   const fusion = fuseFighters(roster(), ids, () => 0.2);
   const save = {
-    version: 2, savedAt: 50000,
+    version: 3, savedAt: 50000,
     game: {
       coins: 100, farmXp: 42, seeds: { potato: 3, carrot: 0, corn: 0 }, selectedCrop: "potato",
       plots: Array.from({ length: 144 }, (_, id) => ({ id, crop: null, plantedAt: null })),
@@ -121,10 +121,10 @@ test("Save V2 round-trips the fused roster without a schema change", () => {
   assert.deepEqual(loadSproutSave(storage), { status: "loaded", save });
 });
 
-test("old Save V2 without pity still loads; Ascended fighter saves but harvested Ascended is rejected", () => {
+test("Save V3 without pity still loads; Ascended fighter saves but harvested Ascended is rejected", () => {
   const { validateSproutSave } = load("@/lib/save-storage");
   const save = {
-    version: 2, savedAt: 50000,
+    version: 3, savedAt: 50000,
     game: { coins: 100, farmXp: 0, seeds: { potato: 3, carrot: 0, corn: 0 }, selectedCrop: "potato",
       plots: Array.from({ length: 144 }, (_, id) => ({ id, crop: null, plantedAt: null })),
       harvestedCrops: [], collection: [], fighters: [fighter("ascended", "potato", "ascended")] },

@@ -18,7 +18,7 @@ export function canChangeFriendship(actor: string, action: FriendAction, link: {
   return link.status === "pending" && (action === "cancel" ? actor === link.requested_by : actor !== link.requested_by);
 }
 
-export function calculateCombatPower(fighters: readonly Fighter[]) {
+export function calculateCombatPower(fighters: readonly Pick<Fighter, "hp" | "attack" | "defense" | "speed">[]) {
   const power = Math.round(fighters.reduce((sum, f) => sum + 0.2 * f.hp + 4 * f.attack + 3 * f.defense + 2 * f.speed, 0));
   if (!Number.isSafeInteger(power) || power < 0 || power > 2147483647) throw new Error("Defense stats are out of range.");
   return power;

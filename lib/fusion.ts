@@ -21,6 +21,7 @@ export function getFusionEligibility(fighters: Fighter[], selectedIds: string[])
   const selected = selectedIds.map((id) => fighters.find((fighter) => fighter.id === id));
   if (selected.some((fighter) => !fighter)) return { valid: false, reason: "A selected fighter is no longer in your roster." };
   const [first] = selected as Fighter[];
+  if (selected.some((fighter) => fighter?.locked)) return { valid: false, reason: "Locked fighters cannot be used for Fusion." };
   if (selected.some((fighter) => fighter?.crop !== first.crop)) return { valid: false, reason: "All four fighters must be the same species." };
   if (selected.some((fighter) => fighter?.mutation !== first.mutation)) return { valid: false, reason: "All four fighters must have the same mutation." };
   if (first.mutation === "ascended") return { valid: false, reason: "Ascended fighters cannot be fused further." };

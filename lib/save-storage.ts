@@ -77,6 +77,7 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   for (const fighter of game.fighters) {
     if (!isRecord(fighter) || !isId(fighter.id) || fighterIds.has(fighter.id) || !isCrop(fighter.crop) || !isFighterMutation(fighter.mutation) || !isPersonality(fighter.personality)) return false;
     if (![fighter.hp, fighter.attack, fighter.defense, fighter.speed].every(isFiniteNonnegative)) return false;
+    if (fighter.locked !== undefined && typeof fighter.locked !== "boolean") return false;
     if (requireFighterProgression && (!Number.isSafeInteger(fighter.level) || (fighter.level as number) < 1 || !Number.isSafeInteger(fighter.xp) || (fighter.xp as number) < 0 || fighter.level !== getLevelFromXp(fighter.xp as number))) return false;
     fighterIds.add(fighter.id);
   }
@@ -131,7 +132,7 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
       plots: value.game.plots.map((plot) => ({ ...plot })),
       harvestedCrops: value.game.harvestedCrops.map((item) => ({ ...item })),
       collection: value.game.collection.map((entry) => ({ ...entry })),
-      fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0 })),
+      fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0, locked: false })),
       ascensionPity: value.game.ascensionPity ? { ...value.game.ascensionPity } : undefined,
       dungeon: { highestClearedFloor: 0 },
     },
@@ -141,7 +142,10 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
 }
 
 export function migrateSproutSave(value: unknown): SproutSaveV3 | null {
-  if (validateSproutSave(value)) return value;
+  if (validateSproutSave(value)) return {
+    ...value,
+    game: { ...value.game, fighters: value.game.fighters.map((fighter) => ({ ...fighter, locked: fighter.locked ?? false })) },
+  };
   if (!isRecord(value)) return null;
   if (value.version === 1) {
     const v2 = migrateV1ToV2(value);

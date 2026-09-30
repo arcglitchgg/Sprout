@@ -1,4 +1,4 @@
-import { validateSproutSave } from "@/lib/save-storage";
+import { migrateSproutSave } from "@/lib/save-storage";
 import type { SproutSaveV3 } from "@/lib/save-types";
 import { authenticatedRequest } from "@/lib/session-client";
 
@@ -8,8 +8,10 @@ export async function fetchCloudSave(session: string): Promise<CloudSnapshot> {
   const response = await authenticatedRequest(session, (activeSession) => fetch("/api/game/save", { headers: { Authorization: `Bearer ${activeSession}` }, cache: "no-store", signal: AbortSignal.timeout(5000) }));
   if (!response.ok) throw new Error("Cloud save load failed.");
   const data: unknown = await response.json();
-  if (!data || typeof data !== "object" || !("save" in data) || !("revision" in data) || !(data.save === null || validateSproutSave(data.save)) || !(data.revision === null || typeof data.revision === "number")) throw new Error("Cloud save response is invalid.");
-  return { save: data.save, revision: data.revision };
+  if (!data || typeof data !== "object" || !("save" in data) || !("revision" in data) || !(data.revision === null || typeof data.revision === "number")) throw new Error("Cloud save response is invalid.");
+  const save = data.save === null ? null : migrateSproutSave(data.save);
+  if (data.save !== null && !save) throw new Error("Cloud save response is invalid.");
+  return { save, revision: data.revision };
 }
 
 export async function putCloudSave(session: string, save: SproutSaveV3, revision: number | null): Promise<number | "conflict"> {

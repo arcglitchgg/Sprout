@@ -8,7 +8,8 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
     <div
       className="rounded-xl bg-[#fff8dc] p-4"
     >
-      <div className="text-lg font-bold">
+      <div className="flex items-start justify-between gap-2 text-lg font-bold">
+        <span>
         {
           mutations[fighter.mutation]
             .label
@@ -18,7 +19,8 @@ export default function FighterCard({ fighter }: { fighter: Fighter }) {
           mutations[fighter.mutation]
             .name
         }{" "}
-        {crops[fighter.crop].name}
+        {crops[fighter.crop].name}</span>
+        {fighter.locked && <span className="text-xs" title="Locked" aria-label="Locked fighter">🔒</span>}
       </div>
 
       <div className="mt-1 text-sm font-bold">
