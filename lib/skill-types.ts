@@ -4,7 +4,12 @@ export type ActionDefinition = {
   id: ActionId;
   name: string;
   baseWeight: number;
-  attackMultiplier: number;
+  power: {
+    attack: number;
+    hp: number;
+    speed: number;
+    multiplier: number;
+  };
   highImpact: boolean;
   targeting: "personality" | "front" | "rear" | "lowest-defense";
 };

@@ -17,7 +17,7 @@ function load(name) {
   return loaded.exports;
 }
 const { createBattle, advanceBattle, actionInterval } = load("@/lib/battle");
-const { getActionCandidates, selectActionTarget, rollAction, calculateDamage } = load("@/lib/skill-selection");
+const { getActionCandidates, selectActionTarget, rollAction, calculateDamage, calculateActionDamage, getPersonalityActionBaseWeight } = load("@/lib/skill-selection");
 const { ACTIONS, SPECIES_ACTIONS } = load("@/lib/skill-data");
 const team = ["potato", "carrot", "corn"].map((crop, i) => ({ id: `p${i}`, crop, mutation: "normal", personality: "lazy", hp: 100, attack: 20, defense: 20, speed: 20 }));
 const fresh = (seed = 42) => createBattle(team, "test", seed);
@@ -40,13 +40,23 @@ test("same seed replays exactly, including different clock batches, without muta
   assert.equal(team[0].hp, 100);
 });
 
-test("exactly basic plus one species skill, with specified damage multipliers", () => {
-  for (const [crop, multiplier] of [["potato", 1.4], ["carrot", 1.3], ["corn", 1.6]]) {
-    assert.equal(SPECIES_ACTIONS[crop].length, 2);
-    const action = ACTIONS[SPECIES_ACTIONS[crop][1]];
-    assert.equal(action.attackMultiplier, multiplier);
-    assert.equal(calculateDamage(team[0], { ...team[1], currentHp: 100, defense: 0 }, multiplier), Math.round(20 * multiplier));
-  }
+test("species skills scale from their signature effective stats", () => {
+  const target = { ...team[1], currentHp: 1000, hp: 1000, defense: 0 };
+  const attacker = { ...team[0], attack: 20, hp: 130, speed: 40, personality: "clever" };
+  assert.equal(calculateActionDamage(attacker, target, ACTIONS["heavy-slam"]), Math.round((20 + 130 * 0.10) * 1.20));
+  assert.equal(calculateActionDamage(attacker, target, ACTIONS.backstab), Math.round((20 + 40 * 0.35) * 1.25));
+  assert.equal(calculateActionDamage(attacker, target, ACTIONS["kernel-burst"]), Math.round(20 * 1.60));
+  assert.equal(calculateActionDamage({ ...attacker, hp: 260 }, target, ACTIONS["heavy-slam"]), Math.round((20 + 260 * 0.10) * 1.20));
+  assert.equal(calculateActionDamage({ ...attacker, speed: 80 }, target, ACTIONS.backstab), Math.round((20 + 80 * 0.35) * 1.25));
+  assert.equal(calculateActionDamage({ ...attacker, hp: 260, speed: 80 }, target, ACTIONS["kernel-burst"]), Math.round(20 * 1.60));
+});
+
+test("Speed action interval uses a 600ms safety floor", () => {
+  assert.equal(actionInterval(50), 1200);
+  assert.equal(actionInterval(60), 1000);
+  assert.equal(actionInterval(80), 750);
+  assert.equal(actionInterval(100), 600);
+  assert.equal(actionInterval(120), 600);
 });
 
 test("base weights and personality modifiers bias both actions without eliminating either", () => {
@@ -78,6 +88,11 @@ test("species targeting, dead-target exclusion, and rear fallback", () => {
 });
 
 test("Clever biases higher tactical value but still rolls basics and skills", () => {
+  const cleverBasic = getPersonalityActionBaseWeight("clever", ACTIONS.basic);
+  const cleverSkill = getPersonalityActionBaseWeight("clever", ACTIONS["heavy-slam"]);
+  assert.equal(cleverBasic, 60);
+  assert.equal(cleverSkill, 50);
+  assert.ok(Math.abs(cleverSkill / (cleverBasic + cleverSkill) - 0.4545) < 0.001);
   const candidates = weights("clever");
   assert.ok(candidates[1].weight / candidates[1].baseWeight > candidates[0].weight / candidates[0].baseWeight);
   let rng = 0;
@@ -90,6 +105,8 @@ test("Clever biases higher tactical value but still rolls basics and skills", ()
   assert.ok(counts.basic > 100 && counts["heavy-slam"] > 100);
   const probability = candidates[1].weight / (candidates[0].weight + candidates[1].weight);
   assert.ok(Math.abs(counts["heavy-slam"] / 2000 - probability) < 0.05);
+  const target = { ...team[1], hp: 1000, currentHp: 1000, defense: 0 };
+  assert.equal(calculateActionDamage({ ...team[0], personality: "clever" }, target, ACTIONS["kernel-burst"]), Math.round(20 * 1.6), "Clever has no skill damage bonus");
 });
 
 test("Lazy favors high-impact actions without modifying Speed or skipping turns", () => {
@@ -138,7 +155,7 @@ test("Protective intercepts a species skill once, uses its own DEF, and refreshe
   assert.equal(chosen.decisions[0].intendedTargetId, "enemy-carrot");
   assert.equal(chosen.decisions[0].actualTargetId, "enemy-potato");
   assert.equal(chosen.combatants[4].currentHp, 10);
-  assert.equal(chosen.combatants[3].currentHp, 130 - Math.round(20 * 1.3 * 100 / 135));
+  assert.equal(chosen.combatants[3].currentHp, 130 - Math.round((20 + 20 * 0.35) * 1.25 * 100 / 135));
   assert.equal(chosen.combatants[3].guardReady, false);
   const later = advanceBattle(chosen, 4000);
   assert.equal(later.combatants[4].currentHp, 0);

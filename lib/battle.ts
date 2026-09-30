@@ -1,5 +1,5 @@
 import { BATTLE_DIALOGUE, BATTLE_LIMIT_MS, TRAINING_TEAM } from "@/lib/battle-data";
-import { calculateDamage, getActionCandidates, rollAction } from "@/lib/skill-selection";
+import { calculateActionDamage, calculateDamage, getActionCandidates, rollAction } from "@/lib/skill-selection";
 import { ACTIONS } from "@/lib/skill-data";
 import { crops } from "@/lib/game-data";
 import { getEffectiveFighter } from "@/lib/fighter-progression";
@@ -7,7 +7,7 @@ import type { BattleSide, BattleState, Combatant } from "@/lib/battle-types";
 import type { Fighter } from "@/lib/game-types";
 
 export function actionInterval(speed: number) {
-  return Math.max(1200, Math.min(5000, 3000 * 20 / speed));
+  return Math.max(600, Math.min(5000, 3000 * 20 / speed));
 }
 
 export { calculateDamage } from "@/lib/skill-selection";
@@ -82,7 +82,7 @@ export function advanceBattle(previous: BattleState, elapsed: number): BattleSta
       target = protector; // No chained interceptions; use the recipient's DEF and HP.
     }
     state.decisions.push({ at: state.elapsed, actorId: attacker.id, rngBefore, rngAfter: nextState, roll, candidates, chosenAction: action.id, intendedTargetId: chosen.targetId, actualTargetId: target.id });
-    const damage = calculateDamage(attacker, target, action.attackMultiplier);
+    const damage = calculateActionDamage(attacker, target, action);
     attacker.lastActionId = action.id;
     target.currentHp = Math.max(0, target.currentHp - damage);
     log(`${label(attacker)} uses ${action.name} on ${label(target)} for ${damage}.`);

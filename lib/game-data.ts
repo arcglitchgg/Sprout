@@ -88,7 +88,7 @@ export const personalities: Record<
   clever: {
     name: "Clever",
     emoji: "🤓",
-    description: "+10% Skill Power",
+    description: "Uses skills more often and favors tactically valuable actions",
   },
   mean: {
     name: "Mean",

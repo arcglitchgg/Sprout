@@ -1,11 +1,24 @@
 import type { Combatant } from "@/lib/battle-types";
-import type { Fighter } from "@/lib/game-types";
+import type { Fighter, PersonalityType } from "@/lib/game-types";
 import { ACTIONS, SPECIES_ACTIONS } from "@/lib/skill-data";
 import type { ActionCandidate, ActionDefinition } from "@/lib/skill-types";
 
 export function calculateDamage(attacker: Fighter, target: Fighter & { currentHp: number }, multiplier = 1) {
+  return calculateRawPowerDamage(attacker, target, attacker.attack * multiplier);
+}
+
+function calculateRawPowerDamage(attacker: Fighter, target: Fighter & { currentHp: number }, rawPower: number) {
   const bonus = attacker.personality === "mean" && target.currentHp < target.hp / 2 ? 1.15 : 1;
-  return Math.max(1, Math.round(attacker.attack * multiplier * 100 / (100 + target.defense) * bonus));
+  return Math.max(1, Math.round(rawPower * 100 / (100 + target.defense) * bonus));
+}
+
+export function calculateActionDamage(attacker: Fighter, target: Fighter & { currentHp: number }, action: ActionDefinition) {
+  const rawPower = (attacker.attack * action.power.attack + attacker.hp * action.power.hp + attacker.speed * action.power.speed) * action.power.multiplier;
+  return calculateRawPowerDamage(attacker, target, rawPower);
+}
+
+export function getPersonalityActionBaseWeight(personality: PersonalityType, action: ActionDefinition) {
+  return action.baseWeight * (personality === "clever" && action.id !== "basic" ? 2 : 1);
 }
 
 /** Species preferences take priority for skills; personality selects basic targets and breaks skill ties. */
@@ -13,7 +26,7 @@ export function selectActionTarget(attacker: Combatant, enemies: Combatant[], ac
   const living = enemies.filter((enemy) => enemy.currentHp > 0);
   const personalityOrder = (a: Combatant, b: Combatant) => {
     if (attacker.personality === "angry") return a.currentHp - b.currentHp;
-    if (attacker.personality === "clever") return calculateDamage(attacker, b, action.attackMultiplier) - calculateDamage(attacker, a, action.attackMultiplier);
+    if (attacker.personality === "clever") return calculateActionDamage(attacker, b, action) - calculateActionDamage(attacker, a, action);
     if (attacker.personality === "mean") {
       const aLow = a.currentHp < a.hp / 2;
       const bLow = b.currentHp < b.hp / 2;
@@ -36,12 +49,12 @@ export function getActionCandidates(attacker: Combatant, combatants: Combatant[]
     const action = ACTIONS[id];
     const target = selectActionTarget(attacker, enemies, action);
     if (!target) return [];
-    const damage = calculateDamage(attacker, target, action.attackMultiplier);
+    const damage = calculateActionDamage(attacker, target, action);
     const lethal = damage >= target.currentHp;
-    let weight = action.baseWeight;
-    const reasons: string[] = [];
-    const modify = (multiplier: number, reason: string) => { weight *= multiplier; reasons.push(`${reason} ×${multiplier}`); };
     const skill = id !== "basic";
+    let weight = getPersonalityActionBaseWeight(attacker.personality, action);
+    const reasons: string[] = attacker.personality === "clever" && skill ? ["Frequent skill use ×2"] : [];
+    const modify = (multiplier: number, reason: string) => { weight *= multiplier; reasons.push(`${reason} ×${multiplier}`); };
     if (attacker.personality === "angry" && skill) {
       modify(1.6, "Offensive skill");
       if (target.currentHp < target.hp / 2) modify(1.5, "Low-HP target");

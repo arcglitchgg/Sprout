@@ -3,8 +3,8 @@ export const GUIDE_TOPICS = [
   { id: "farming", title: "Farming", body: "Planting consumes one owned seed. Crops keep growing from their planted timestamp even while Sprout is closed." },
   { id: "mutations", title: "Mutations", body: "Harvests can be Normal, Large, Golden, or Prismatic. Higher rarities sell for more and awaken into stronger fighters." },
   { id: "awakening", title: "Awakening", body: "Awaken harvested crops at the Farmhouse for coins. The crop is consumed and becomes a Level 1 fighter with a random personality." },
-  { id: "fighters", title: "Fighters", body: "Species, rarity, personality, and level shape combat stats. Dungeon victories give XP only to the three participating fighters." },
-  { id: "personalities", title: "Personalities", body: "Angry, Protective, Lazy, Clever, and Mean fighters choose targets and actions differently during automatic battles." },
+  { id: "fighters", title: "Fighters", body: "Species, rarity, personality, and level shape combat stats. Heavy Slam grows with HP, Backstab grows with Speed, and Kernel Burst scales heavily with ATK. Dungeon victories give XP only to the three participating fighters." },
+  { id: "personalities", title: "Personalities", body: "Angry, Protective, Lazy, Clever, and Mean fighters choose targets and actions differently. Clever fighters use skills more often and favor tactically valuable actions." },
   { id: "fusion", title: "Fusion", body: "Fuse four unlocked fighters of the same species and rarity. The four inputs are replaced by one newly generated fighter." },
   { id: "ascension", title: "Ascended + Ascension pity", body: "Four Prismatic fighters can produce Ascended. Each species has separate pity, and its third attempt is guaranteed after two failures." },
   { id: "active-team", title: "Active Team", body: "Set Front, Rear Left, and Rear Right at the Farmhouse. This team becomes the default for Dungeon and PvP, but can be overridden per battle." },
@@ -16,6 +16,16 @@ export const GUIDE_TOPICS = [
 export type GuideTopicId = (typeof GUIDE_TOPICS)[number]["id"];
 
 export const PATCH_NOTES = [{
+  version: "Combat Identity Rebalance",
+  date: "September 2026",
+  bullets: [
+    "Effective Speed now scales up to 100 before reaching the action-speed cap",
+    "Potato Heavy Slam now grows stronger with HP",
+    "Carrot Backstab now grows stronger with Speed",
+    "Corn Kernel Burst remains focused on ATK",
+    "Clever fighters use skills more often instead of gaining bonus skill damage",
+  ],
+}, {
   version: "Roster & Progression Update",
   date: "September 2026",
   bullets: [
