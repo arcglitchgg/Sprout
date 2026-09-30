@@ -12,7 +12,8 @@ import { harvestPlot, harvestReadyPlots, sellHarvestedCrop, sellHarvestedCrops }
 import { FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
 import { releaseRosterFighter, setRosterFighterLocked } from "@/lib/fighter-roster";
-import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
+import { EMPTY_ACTIVE_TEAM, normalizeActiveTeam, updateActiveTeam } from "@/lib/team-selection";
+import type { ActiveTeam, AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
 import type { SproutGameSaveV3 } from "@/lib/save-types";
 import type { WorldNotification } from "@/components/WorldNotifications";
 
@@ -29,6 +30,7 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
   const [collection, setCollection] = useState<CollectionEntry[]>(() => initial ? initial.collection.map((entry) => ({ ...entry })) : []);
   const [harvestedCrops, setHarvestedCrops] = useState<HarvestedCrop[]>(() => initial ? initial.harvestedCrops.map((item) => ({ ...item })) : []);
   const [fighters, setFighters] = useState<Fighter[]>(() => initial ? initial.fighters.map((fighter) => ({ ...fighter })) : []);
+  const [activeTeam, setActiveTeamState] = useState<ActiveTeam>(() => initial ? normalizeActiveTeam(initial.activeTeam, initial.fighters) : [...EMPTY_ACTIVE_TEAM]);
   const [ascensionPity, setAscensionPity] = useState<AscensionPity>(() => ({ ...INITIAL_ASCENSION_PITY, ...initial?.ascensionPity }));
   const [dungeon, setDungeon] = useState(() => initial?.dungeon ? structuredClone(initial.dungeon) : { ...INITIAL_DUNGEON_PROGRESS });
   const coinsRef = useRef(coins);
@@ -38,6 +40,7 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
   const harvestedCropsRef = useRef(harvestedCrops);
   const collectionRef = useRef(collection);
   const fightersRef = useRef(fighters);
+  const activeTeamRef = useRef(activeTeam);
   const dungeonRef = useRef(dungeon);
   const ascensionPityRef = useRef(ascensionPity);
 
@@ -203,8 +206,11 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     const fusion = createFusion(fightersRef.current, selectedIds, Math.random, ascensionPityRef.current);
     if (!fusion) return null;
     fightersRef.current = fusion.remaining;
+    const cleanedTeam = normalizeActiveTeam(activeTeamRef.current, fusion.remaining);
+    activeTeamRef.current = cleanedTeam;
     ascensionPityRef.current = fusion.pity;
     setFighters(fusion.remaining);
+    setActiveTeamState(cleanedTeam);
     setAscensionPity(fusion.pity);
     return fusion.result;
   }
@@ -221,9 +227,20 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     const result = releaseRosterFighter(fightersRef.current, fighterId);
     if (!result) return false;
     fightersRef.current = result.remaining;
+    const cleanedTeam = normalizeActiveTeam(activeTeamRef.current, result.remaining);
+    activeTeamRef.current = cleanedTeam;
     setFighters(result.remaining);
+    setActiveTeamState(cleanedTeam);
     return true;
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, awardDungeonVictory };
+  function setActiveTeam(selectedIds: string[]) {
+    const next = updateActiveTeam(activeTeamRef.current, selectedIds, fightersRef.current);
+    if (!next) return false;
+    activeTeamRef.current = next;
+    setActiveTeamState(next);
+    return true;
+  }
+
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, activeTeam, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, setActiveTeam, awardDungeonVictory };
 }

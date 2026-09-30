@@ -4,17 +4,18 @@ import { useState } from "react";
 import CollectionBook from "@/components/CollectionBook";
 import FighterCard from "@/components/FighterCard";
 import HarvestedCropCard from "@/components/HarvestedCropCard";
+import TeamSelector from "@/components/TeamSelector";
 import { AWAKENING_COSTS } from "@/lib/awakening";
 import { ASCENSION_HARD_PITY, FUSION_UPGRADE_CHANCE, getFusionEligibility } from "@/lib/fusion";
 import { crops, mutations } from "@/lib/game-data";
 import { FUSION_RARITIES, FUSION_SPECIES, getFusionRosterGroups, getReleaseConfirmationCount } from "@/lib/fighter-roster";
-import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, HarvestMutationType, MutationType } from "@/lib/game-types";
+import type { ActiveTeam, AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, HarvestMutationType, MutationType } from "@/lib/game-types";
 
 const nextTier: Record<HarvestMutationType, string> = { normal: "Large", large: "Golden", golden: "Prismatic", prismatic: "Ascended" };
-type FarmhouseTab = "collection" | "fighters" | "harvested crops" | "fusion";
-type Props = { collection: CollectionEntry[]; coins: number; fighters: Fighter[]; ascensionPity: AscensionPity; harvestedCrops: HarvestedCrop[]; awakenCrop: (itemId: string) => void; fuseFighters: (selectedIds: string[]) => Fighter | null; setFighterLocked: (fighterId: string, locked: boolean) => boolean; releaseFighter: (fighterId: string) => boolean; onClose: () => void };
+type FarmhouseTab = "collection" | "fighters" | "active team" | "harvested crops" | "fusion";
+type Props = { collection: CollectionEntry[]; coins: number; fighters: Fighter[]; activeTeam: ActiveTeam; ascensionPity: AscensionPity; harvestedCrops: HarvestedCrop[]; awakenCrop: (itemId: string) => void; fuseFighters: (selectedIds: string[]) => Fighter | null; setFighterLocked: (fighterId: string, locked: boolean) => boolean; releaseFighter: (fighterId: string) => boolean; setActiveTeam: (fighterIds: string[]) => boolean; onClose: () => void };
 
-export default function WorldFarmhouseOverlay({ collection, coins, fighters, ascensionPity, harvestedCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, onClose }: Props) {
+export default function WorldFarmhouseOverlay({ collection, coins, fighters, activeTeam, ascensionPity, harvestedCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, setActiveTeam, onClose }: Props) {
   const [tab, setTab] = useState<FarmhouseTab>("collection");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [fusionResult, setFusionResult] = useState<Fighter | null>(null);
@@ -46,13 +47,18 @@ export default function WorldFarmhouseOverlay({ collection, coins, fighters, asc
   return <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="farmhouse-title">
     <section className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border-2 border-[#765438] bg-[#efe2b8] text-[#2f3e2f] shadow-2xl">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-[#765438]/35 bg-[#d8b875] px-4 py-3"><div><h2 id="farmhouse-title" className="text-xl font-bold sm:text-2xl">Farmhouse</h2><p className="text-xs opacity-70 sm:text-sm">Your discoveries and awakened fighters.</p></div><button type="button" onClick={closeFarmhouse} className="rounded-lg bg-[#fff8dc] px-3 py-2 font-bold shadow-sm hover:bg-white">Close</button></header>
-      <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-[#765438]/25 bg-[#e5cf98] px-3 pt-3" role="tablist" aria-label="Farmhouse sections">{(["collection", "fighters", "harvested crops", "fusion"] as FarmhouseTab[]).map((value) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setReleaseConfirmation(null); }} className={`shrink-0 rounded-t-lg px-3 py-2 text-sm font-bold capitalize ${tab === value ? "bg-[#fff8dc]" : "bg-[#c8aa6a] hover:bg-[#d4ba80]"}`}>{value}{value === "fighters" ? ` (${fighters.length})` : value === "harvested crops" ? ` (${harvestedCrops.length})` : ""}</button>)}</div>
+      <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-[#765438]/25 bg-[#e5cf98] px-3 pt-3" role="tablist" aria-label="Farmhouse sections">{(["collection", "fighters", "active team", "harvested crops", "fusion"] as FarmhouseTab[]).map((value) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setReleaseConfirmation(null); }} className={`shrink-0 rounded-t-lg px-3 py-2 text-sm font-bold capitalize ${tab === value ? "bg-[#fff8dc]" : "bg-[#c8aa6a] hover:bg-[#d4ba80]"}`}>{value}{value === "fighters" ? ` (${fighters.length})` : value === "harvested crops" ? ` (${harvestedCrops.length})` : ""}</button>)}</div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
-        {tab === "collection" ? <CollectionBook collection={collection} /> : tab === "harvested crops" ? <HarvestedSection coins={coins} items={harvestedCrops} awakenCrop={awakenCrop} /> : tab === "fusion" ? <FusionPanel groups={groups} activeGroup={activeGroup} setOpenGroup={(group) => { setOpenGroup(group); setSelectedIds([]); setFusionResult(null); }} selected={selected} firstSelected={firstSelected} eligibility={eligibility} fusionResult={fusionResult} ascensionPity={ascensionPity} toggleFighter={toggleFighter} performFusion={performFusion} clear={() => setSelectedIds([])} /> : <Roster fighters={fighters} setFighterLocked={setFighterLocked} requestRelease={(fighterId) => setReleaseConfirmation({ fighterId, step: 1 })} />}
+        {tab === "collection" ? <CollectionBook collection={collection} /> : tab === "active team" ? <ActiveTeamEditor fighters={fighters} activeTeam={activeTeam} setActiveTeam={setActiveTeam} /> : tab === "harvested crops" ? <HarvestedSection coins={coins} items={harvestedCrops} awakenCrop={awakenCrop} /> : tab === "fusion" ? <FusionPanel groups={groups} activeGroup={activeGroup} setOpenGroup={(group) => { setOpenGroup(group); setSelectedIds([]); setFusionResult(null); }} selected={selected} firstSelected={firstSelected} eligibility={eligibility} fusionResult={fusionResult} ascensionPity={ascensionPity} toggleFighter={toggleFighter} performFusion={performFusion} clear={() => setSelectedIds([])} /> : <Roster fighters={fighters} setFighterLocked={setFighterLocked} requestRelease={(fighterId) => setReleaseConfirmation({ fighterId, step: 1 })} />}
       </div>
       {releaseConfirmation && <ReleaseConfirmation fighters={fighters} confirmation={releaseConfirmation} onConfirm={confirmRelease} onCancel={() => setReleaseConfirmation(null)} />}
     </section>
   </div>;
+}
+
+function ActiveTeamEditor({ fighters, activeTeam, setActiveTeam }: { fighters: Fighter[]; activeTeam: ActiveTeam; setActiveTeam: (ids: string[]) => boolean }) {
+  const selected = activeTeam.map((id) => id ?? "");
+  return <div className="rounded-xl bg-[#fff8dc] p-4"><h3 className="text-lg font-black">Active Team</h3><p className="text-sm">Your default ordered team for Dungeon and PvP. Locked fighters are allowed.</p><TeamSelector fighters={fighters} selected={selected} onSelect={setActiveTeam} locked={false} />{selected.some((id) => !id) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating before it can be used automatically.</p>}</div>;
 }
 
 function HarvestedSection({ coins, items, awakenCrop }: { coins: number; items: HarvestedCrop[]; awakenCrop: (id: string) => void }) {

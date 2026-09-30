@@ -112,7 +112,7 @@ test("PvP API derives actor from session and accepts fighter IDs, never client s
   const calls = [];
   const server = loader({
     "@/lib/discord-session": { sessionUserFromRequest: (request) => request.headers.get("authorization") === "Bearer trusted" ? "11111" : null },
-    "@/lib/save-storage": { validateSproutSave: () => true },
+    "@/lib/save-storage": { migrateSproutSave: (save) => save },
     "@/lib/supabase-admin": {
       readCloudSave: async () => ({ save: { game: { fighters: fighters("a") } }, revision: 7 }),
       supabaseRequest: async (path, options) => { calls.push({ path, body: JSON.parse(options.body) }); return Response.json({ ok: true }); },

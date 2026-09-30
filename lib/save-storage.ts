@@ -1,6 +1,7 @@
 import { FIRST_WORLD } from "@/lib/world-data";
 import { TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { getLevelFromXp } from "@/lib/fighter-progression";
+import { normalizeActiveTeam } from "@/lib/team-selection";
 import type { CropType, HarvestMutationType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
 import type { SproutSaveV1, SproutSaveV2, SproutSaveV3 } from "@/lib/save-types";
 
@@ -82,6 +83,10 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
     fighterIds.add(fighter.id);
   }
 
+  if (requireFighterProgression && game.activeTeam !== undefined) {
+    if (!Array.isArray(game.activeTeam) || game.activeTeam.length !== 3 || game.activeTeam.some((id) => id !== null && typeof id !== "string")) return false;
+  }
+
   return validFarmerTile(value.world.farmerTile) && (value.world.facing === "left" || value.world.facing === "right");
 }
 
@@ -135,6 +140,7 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
       fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0, locked: false })),
       ascensionPity: value.game.ascensionPity ? { ...value.game.ascensionPity } : undefined,
       dungeon: { highestClearedFloor: 0 },
+      activeTeam: [null, null, null],
     },
     world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
   };
@@ -144,7 +150,11 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
 export function migrateSproutSave(value: unknown): SproutSaveV3 | null {
   if (validateSproutSave(value)) return {
     ...value,
-    game: { ...value.game, fighters: value.game.fighters.map((fighter) => ({ ...fighter, locked: fighter.locked ?? false })) },
+    game: {
+      ...value.game,
+      fighters: value.game.fighters.map((fighter) => ({ ...fighter, locked: fighter.locked ?? false })),
+      activeTeam: normalizeActiveTeam(value.game.activeTeam, value.game.fighters),
+    },
   };
   if (!isRecord(value)) return null;
   if (value.version === 1) {

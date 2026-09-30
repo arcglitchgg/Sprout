@@ -41,6 +41,7 @@ function validSave() {
       harvestedCrops: [{ id: "harvest-1", crop: "corn", mutation: "golden", baseSellValue: 30, sellValue: 90, harvestedAt: 20_000 }],
       collection: [{ crop: "corn", mutation: "golden" }],
       fighters: [{ id: "fighter-1", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20, level: 1, xp: 0, locked: false }],
+      activeTeam: ["fighter-1", null, null],
     },
     world: { farmerTile: { ...FIRST_WORLD.start }, facing: "left" },
   };
@@ -52,6 +53,7 @@ function validV1Save() {
   delete save.game.fighters[0].level;
   delete save.game.fighters[0].xp;
   delete save.game.fighters[0].locked;
+  delete save.game.activeTeam;
   save.version = 1;
   save.game.plots = save.game.plots.slice(0, 9);
   return save;
@@ -61,6 +63,7 @@ function validV2Save() {
   const save = validSave();
   save.version = 2;
   save.game.fighters = save.game.fighters.map(({ level, xp, locked, ...fighter }) => fighter);
+  delete save.game.activeTeam;
   return save;
 }
 
@@ -83,6 +86,22 @@ test("old V3 fighters default unlocked and lock state persists", () => {
   const storage = memoryStorage();
   assert.equal(writeSproutSave(loadedOld.save, storage), true);
   assert.equal(loadSproutSave(storage).save.game.fighters[0].locked, true);
+});
+
+test("Active Team persists and stale fighter IDs clear safely", () => {
+  const save = validSave();
+  save.game.fighters.push(
+    { ...save.game.fighters[0], id: "fighter-2", locked: true },
+    { ...save.game.fighters[0], id: "fighter-3" },
+  );
+  save.game.activeTeam = ["fighter-1", "fighter-2", "fighter-3"];
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  assert.deepEqual(loadSproutSave(storage).save.game.activeTeam, save.game.activeTeam);
+  const stale = structuredClone(save);
+  stale.game.activeTeam[1] = "released-fighter";
+  const loaded = loadSproutSave(memoryStorage({ [SAVE_KEY]: JSON.stringify(stale) }));
+  assert.deepEqual(loaded.save.game.activeTeam, ["fighter-1", null, "fighter-3"]);
 });
 
 test("planted timestamps survive loading and advance against current time", () => {
@@ -110,6 +129,7 @@ test("V1 migration preserves durable progress and loads through V3", () => {
   assert.equal(loaded.status, "loaded");
   assert.equal(loaded.save.version, 3);
   assert.deepEqual(loaded.save.game.fighters[0], { ...v1.game.fighters[0], level: 1, xp: 0, locked: false });
+  assert.deepEqual(loaded.save.game.activeTeam, [null, null, null]);
 });
 
 test("V2 migrates to V3 without regenerating fighter identity or base stats", () => {
@@ -122,6 +142,7 @@ test("V2 migrates to V3 without regenerating fighter identity or base stats", ()
   assert.ok(migrated);
   assert.equal(migrated.version, 3);
   assert.deepEqual(migrated.game.fighters[0], { ...original, level: 1, xp: 0, locked: false });
+  assert.deepEqual(migrated.game.activeTeam, [null, null, null]);
   assert.deepEqual(migrated.game.ascensionPity, v2.game.ascensionPity);
   assert.deepEqual(migrated.game.plots, v2.game.plots);
   assert.deepEqual(migrated.world, v2.world);

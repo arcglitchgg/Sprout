@@ -5,6 +5,7 @@ export type SeedInventory = Record<CropType, number>;
 export type HarvestMutationType = "normal" | "large" | "golden" | "prismatic";
 export type MutationType = HarvestMutationType | "ascended";
 export type AscensionPity = Record<CropType, number>;
+export type ActiveTeam = [string | null, string | null, string | null];
 
 export type PersonalityType =
   | "angry"

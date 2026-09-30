@@ -8,18 +8,21 @@ import type { BattlePresentationProgress } from "@/components/BattleArena";
 import type { BattleState } from "@/lib/battle-types";
 import type { Fighter } from "@/lib/game-types";
 import TeamSelector from "@/components/TeamSelector";
-import { retainExistingTeamIds } from "@/lib/team-selection";
+import { getDefaultBattleSelection, retainExistingTeamIds, validActiveTeamSelection } from "@/lib/team-selection";
 
-export default function Battle({ fighters, enemyTeam, title = "Training Garden · 3v3", rewardDescription, victoryDetail, onVictory, onComplete }: {
+export default function Battle({ fighters, enemyTeam, initialTeamIds, title = "Training Garden · 3v3", rewardDescription, victoryDetail, onVictory, onComplete }: {
   fighters: Fighter[];
   enemyTeam?: Fighter[];
+  initialTeamIds?: (string | null)[];
   title?: string;
   rewardDescription?: string;
   victoryDetail?: string;
   onVictory?: (result: BattleState) => void;
   onComplete?: (result: BattleState) => void;
 }) {
-  const [selected, setSelected] = useState(["", "", ""]);
+  const initialValid = validActiveTeamSelection(initialTeamIds, fighters);
+  const [selected, setSelected] = useState<string[]>(() => getDefaultBattleSelection(initialTeamIds, fighters));
+  const [choosingTeam, setChoosingTeam] = useState(!initialValid);
   const [presentation, setPresentation] = useState<BattlePresentationProgress>({ elapsed: 0, logCount: 0, complete: false });
   const { battle, startBattle } = useBattle();
   const logRef = useRef<HTMLDivElement>(null);
@@ -53,7 +56,9 @@ export default function Battle({ fighters, enemyTeam, title = "Training Garden �
     <section className="mt-6 rounded-2xl bg-[#f4e8c1] p-4">
       <h2 className="text-xl font-bold">{title}</h2>
       <p className="mt-1 text-sm">{rewardDescription ?? `Victory: ${VICTORY_COINS} coins.`} Defeat or draw: no penalty. Fighters recover fully after battle.</p>
-      <TeamSelector fighters={fighters} selected={availableSelection} onSelect={setSelected} locked={running || presenting} />
+      {!choosingTeam && valid && <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Active Team</strong><button type="button" onClick={() => setChoosingTeam(true)} className="text-sm font-bold underline">Choose Different Team</button></div><div className="mt-2 grid gap-2 sm:grid-cols-3">{team.map((fighter, slot) => <div key={fighter.id} className="rounded-lg bg-white/60 p-2 text-xs"><strong>{slot === 0 ? "Front" : slot === 1 ? "Rear Left" : "Rear Right"}</strong><span className="block">Lv. {fighter.level} {fighter.crop} · {fighter.mutation} · {fighter.personality}</span></div>)}</div></div>}
+      {choosingTeam && <TeamSelector fighters={fighters} selected={availableSelection} onSelect={setSelected} locked={running || presenting} />}
+      {!initialValid && initialTeamIds?.some(Boolean) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating. Choose a team for this battle.</p>}
       <button disabled={!valid || running || presenting} onClick={beginBattle} className="my-4 rounded-xl bg-[#d9ed92] px-5 py-3 font-bold disabled:opacity-40">
         {presenting ? "Battle in progress" : battle ? "Battle again" : "Start battle"}
       </button>

@@ -26,7 +26,7 @@ import type { CameraMode } from "@/lib/world-camera";
 import { getPlotUnlockLevel } from "@/lib/progression";
 import { crops } from "@/lib/game-data";
 import { getSecondsRemaining, isReady } from "@/lib/farming";
-import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
+import type { ActiveTeam, AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
 import type { BattleState } from "@/lib/battle-types";
 import type { DungeonVictoryReward } from "@/lib/dungeon";
 import type { DungeonProgress } from "@/lib/save-types";
@@ -48,6 +48,7 @@ type Props = {
   handlePlotClick: (plot: Plot, clickedAt: number) => string | null;
   harvestAll: (clickedAt: number) => number;
   fighters: Fighter[];
+  activeTeam: ActiveTeam;
   ascensionPity: AscensionPity;
   dungeon: DungeonProgress;
   collection: CollectionEntry[];
@@ -57,6 +58,7 @@ type Props = {
   fuseFighters: (selectedIds: string[]) => Fighter | null;
   setFighterLocked: (fighterId: string, locked: boolean) => boolean;
   releaseFighter: (fighterId: string) => boolean;
+  setActiveTeam: (fighterIds: string[]) => boolean;
   awardDungeonVictory: (result: BattleState, floor: number) => DungeonVictoryReward | null;
   notifications: WorldNotification[];
   notify: (notification: Omit<WorldNotification, "id">) => void;
@@ -75,7 +77,7 @@ export default function PixelWorld(props: Props) {
     onReturnHome={() => setContext({ mode: "own-farm" })} />;
 }
 
-function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, ascensionPity, dungeon, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, awardDungeonVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
+function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, activeTeam, ascensionPity, dungeon, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, setActiveTeam, awardDungeonVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
   context: WorldContext; onVisit: (snapshot: FriendFarmSnapshot) => void; onReturnHome: () => void; cameraMode: CameraMode; setCameraMode: (mode: CameraMode) => void;
 }) {
   const visiting = !canModifyFarm(context);
@@ -309,12 +311,12 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
       )}
 
       {!visiting && seedShopOpen && <WorldSeedShopPanel coins={coins} seeds={seeds} buySeed={buySeed} onClose={() => setSeedShopOpen(false)} />}
-      {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} progress={dungeon} onVictory={awardDungeonVictory} onClose={() => setDungeonOpen(false)} />}
-      {!visiting && farmhouseOpen && <WorldFarmhouseOverlay coins={coins} collection={collection} fighters={fighters} ascensionPity={ascensionPity} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} releaseFighter={releaseFighter} onClose={() => setFarmhouseOpen(false)} />}
+      {!visiting && dungeonOpen && <WorldDungeonOverlay fighters={fighters} activeTeam={activeTeam} progress={dungeon} onVictory={awardDungeonVictory} onClose={() => setDungeonOpen(false)} />}
+      {!visiting && farmhouseOpen && <WorldFarmhouseOverlay coins={coins} collection={collection} fighters={fighters} activeTeam={activeTeam} ascensionPity={ascensionPity} harvestedCrops={harvestedCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} releaseFighter={releaseFighter} setActiveTeam={setActiveTeam} onClose={() => setFarmhouseOpen(false)} />}
       {!visiting && marketOpen && <WorldMarketOverlay coins={coins} harvestedCrops={harvestedCrops} sellCrops={sellCrops} onClose={() => setMarketOpen(false)} />}
       {friendsOpen && <WorldFriendsOverlay fighters={fighters} onVisit={onVisit} onClose={() => setFriendsOpen(false)} presenceOwnerId={context.mode === "visiting" ? context.ownerId : user?.id ?? null} presenceRole={visiting ? "visitor" : "owner"} presenceMemberCount={presentIds.length} />}
       {ownerPrompt !== null && <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Challenge farm owner"><div className="w-full max-w-sm rounded-xl bg-[#fff8dc] p-5 text-[#2f3e2f]"><h3 className="break-words text-lg font-bold">Challenge {ownerPrompt}?</h3><p className="my-3 text-sm">Farm battles are coming next.</p><div className="flex gap-2"><button type="button" disabled className="rounded-lg bg-[#4f772d] px-3 py-2 text-white opacity-40">Battle · Coming next</button><button type="button" onClick={() => setOwnerPrompt(null)} className="rounded-lg border border-[#765438] px-3 py-2 font-bold">Cancel</button></div></div></div>}
-      {challenge?.status === "accepted" && session && user && <WorldPvpOverlay session={session} localId={user.id} opponentId={challenge.role === "outgoing" ? challenge.packet.toUserId : challenge.packet.fromUserId} opponentName={playerName(challenge.role === "outgoing" ? challenge.packet.toUserId : challenge.packet.fromUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)} challengeId={challenge.packet.challengeId} presentIds={presentIds} fighters={fighters} onClose={dismissChallenge} />}
+      {challenge?.status === "accepted" && session && user && <WorldPvpOverlay session={session} localId={user.id} opponentId={challenge.role === "outgoing" ? challenge.packet.toUserId : challenge.packet.fromUserId} opponentName={playerName(challenge.role === "outgoing" ? challenge.packet.toUserId : challenge.packet.fromUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)} challengeId={challenge.packet.challengeId} presentIds={presentIds} fighters={fighters} activeTeam={activeTeam} onClose={dismissChallenge} />}
       {(challengeTarget || challenge?.status === "pending" || (challengeMessage && !challenge)) && <div className="absolute inset-0 z-[76] flex items-center justify-center bg-black/50 p-3" role="dialog" aria-modal="true" aria-label="Player challenge"><div className="w-full max-w-sm rounded-xl border-2 border-[#765438] bg-[#fff8dc] p-4 text-[#2f3e2f] shadow-xl">
         <h3 className="text-lg font-bold">{challenge?.status === "accepted" ? "Challenge accepted — Battle coming next" : challenge?.role === "incoming" ? `${playerName(challenge.packet.fromUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)} challenged you!` : challenge?.role === "outgoing" ? `Waiting for ${playerName(challenge.packet.toUserId, remoteProfiles, context.mode === "visiting" ? context.snapshot.owner : null)}...` : challengeTarget ? `Challenge ${challengeTarget.displayName}?` : challengeMessage}</h3>
         {challengeMessage && challenge && <p className="mt-2 text-sm">{challengeMessage}</p>}

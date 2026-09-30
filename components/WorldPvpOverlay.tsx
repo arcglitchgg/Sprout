@@ -5,16 +5,19 @@ import TeamSelector from "@/components/TeamSelector";
 import FighterCard from "@/components/FighterCard";
 import FriendlyBattle from "@/components/FriendlyBattle";
 import { socialRequest } from "@/lib/social-client";
-import type { Fighter } from "@/lib/game-types";
+import type { ActiveTeam, Fighter } from "@/lib/game-types";
 import type { LivePvpMatch } from "@/lib/pvp-types";
 import { shouldCancelSetupOnLeave, validPvpTeamSelection } from "@/lib/pvp";
+import { getDefaultBattleSelection, validActiveTeamSelection } from "@/lib/team-selection";
 
-export default function WorldPvpOverlay({ session, localId, opponentId, opponentName, challengeId, presentIds, fighters, onClose }: {
+export default function WorldPvpOverlay({ session, localId, opponentId, opponentName, challengeId, presentIds, fighters, activeTeam, onClose }: {
   session: string; localId: string; opponentId: string; opponentName: string; challengeId: string;
-  presentIds: string[]; fighters: Fighter[]; onClose: () => void;
+  presentIds: string[]; fighters: Fighter[]; activeTeam: ActiveTeam; onClose: () => void;
 }) {
   const [match, setMatch] = useState<LivePvpMatch | null>(null);
-  const [selected, setSelected] = useState(["", "", ""]);
+  const activeTeamValid = validActiveTeamSelection(activeTeam, fighters);
+  const [selected, setSelected] = useState<string[]>(() => getDefaultBattleSelection(activeTeam, fighters));
+  const [choosingTeam, setChoosingTeam] = useState(!activeTeamValid);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +69,7 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
         <h2 className="text-xl font-black">Friendly PvP vs {opponentName}</h2>
         <p className="text-sm">Choose three fighters. Both players must ready before battle starts.</p>
         {error && <p role="alert" className="mt-2 font-bold text-[#9b3d25]">{error}</p>}
-        {!submitted && !ended && match?.status === "waiting_for_teams" && <><TeamSelector fighters={fighters} selected={selected} onSelect={setSelected} locked={busy} /><div className="mt-3 grid gap-2 sm:grid-cols-3">{selected.map((id, slot) => { const fighter = fighters.find((entry) => entry.id === id); return fighter ? <FighterCard key={`${slot}:${id}`} fighter={fighter} /> : null; })}</div><button type="button" disabled={!valid || busy} onClick={() => void submit()} className="mt-3 rounded-lg bg-[#4f772d] px-4 py-2 font-bold text-white disabled:opacity-40">Ready</button></>}
+        {!submitted && !ended && match?.status === "waiting_for_teams" && <>{!choosingTeam && valid ? <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Active Team</strong><button type="button" onClick={() => setChoosingTeam(true)} className="text-sm font-bold underline">Choose Different Team</button></div></div> : <TeamSelector fighters={fighters} selected={selected} onSelect={setSelected} locked={busy} />}{!activeTeamValid && activeTeam.some(Boolean) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating. Choose a team for this match.</p>}<div className="mt-3 grid gap-2 sm:grid-cols-3">{selected.map((id, slot) => { const fighter = fighters.find((entry) => entry.id === id); return fighter ? <div key={`${slot}:${id}`}><p className="mb-1 text-xs font-black">{slot === 0 ? "Front" : slot === 1 ? "Rear Left" : "Rear Right"}</p><FighterCard fighter={fighter} /></div> : null; })}</div><button type="button" disabled={!valid || busy} onClick={() => void submit()} className="mt-3 rounded-lg bg-[#4f772d] px-4 py-2 font-bold text-white disabled:opacity-40">Ready</button></>}
         {submitted && !error && <p className="mt-3 font-bold">Waiting for {opponentName} to ready...</p>}
         {!match && !error && <p className="mt-3">Loading match...</p>}
         <button type="button" onClick={() => void cancel()} className="ml-2 mt-3 rounded-lg border border-[#765438] px-4 py-2 font-bold">Cancel</button>
