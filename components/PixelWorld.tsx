@@ -21,7 +21,7 @@ import { useFarmPresence } from "@/hooks/useFarmPresence";
 import { playerInRange, playerName } from "@/lib/challenges";
 import { socialRequest } from "@/lib/social-client";
 import { cellToWorld, worldToCell } from "@/lib/world-coordinates";
-import { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
+import { CAMERA_DRAG_THRESHOLD, cameraOffsetForAnchor, clampCameraZoomForMode, getFollowCamera, getOverviewCamera, screenToCanonicalWorld } from "@/lib/world-camera";
 import type { CameraMode } from "@/lib/world-camera";
 import type { GuideTopicId } from "@/lib/guide-data";
 import { getPlotUnlockLevel } from "@/lib/progression";
@@ -116,6 +116,11 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   const [ownerPrompt, setOwnerPrompt] = useState<string | null>(null);
   const modalOpen = farmhouseOpen || marketOpen || friendsOpen || dungeonOpen || seedShopOpen || ownerPrompt !== null || challengeTarget !== null || challenge !== null;
   const [debug, setDebug] = useState(false);
+  const [cameraZoom, setCameraZoom] = useState(1);
+  const [cameraPan, setCameraPan] = useState({ x: 0, y: 0 });
+  const activePointers = useRef(new Map<number, WorldPoint>());
+  const gesture = useRef<{ centroid: WorldPoint; distance: number; zoom: number; pan: WorldPoint; camera: { scale: number; x: number; y: number }; dragged: boolean } | null>(null);
+  const suppressMapClick = useRef(false);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -267,8 +272,95 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
     moveTo(route.destination, () => setOwnerPrompt(player.displayName));
   }
   const camera = cameraMode === "follow"
-    ? getFollowCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, farmerWorldPosition)
-    : getOverviewCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize);
+    ? getFollowCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, farmerWorldPosition, cameraZoom, cameraPan)
+    : getOverviewCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, cameraZoom, cameraPan);
+
+  function cameraFor(zoom: number, pan = { x: 0, y: 0 }) {
+    return cameraMode === "follow"
+      ? getFollowCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, farmerWorldPosition, zoom, pan)
+      : getOverviewCamera(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT, viewportSize, zoom, pan);
+  }
+
+  function normalizedCameraPan(zoom: number, desiredPan: WorldPoint) {
+    const base = cameraFor(zoom);
+    const clamped = cameraFor(zoom, desiredPan);
+    return { x: clamped.x - base.x, y: clamped.y - base.y };
+  }
+
+  function localPointer(event: { clientX: number; clientY: number }): WorldPoint {
+    const bounds = viewportRef.current?.getBoundingClientRect();
+    return { x: event.clientX - (bounds?.left ?? 0), y: event.clientY - (bounds?.top ?? 0) };
+  }
+
+  function pointerGeometry() {
+    const points = [...activePointers.current.values()];
+    if (!points.length) return null;
+    const centroid = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 });
+    const distance = points.length < 2 ? 0 : Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+    return { centroid, distance };
+  }
+
+  function beginGesture() {
+    const geometry = pointerGeometry();
+    if (!geometry) return;
+    gesture.current = { ...geometry, zoom: cameraZoom, pan: cameraPan, camera, dragged: false };
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (modalOpen || event.button !== 0 || (event.target as HTMLElement).closest("[data-camera-ui]")) return;
+    if (!activePointers.current.size) suppressMapClick.current = false;
+    activePointers.current.set(event.pointerId, localPointer(event));
+    event.currentTarget.setPointerCapture(event.pointerId);
+    beginGesture();
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!activePointers.current.has(event.pointerId) || !gesture.current) return;
+    activePointers.current.set(event.pointerId, localPointer(event));
+    const geometry = pointerGeometry();
+    if (!geometry) return;
+    const start = gesture.current;
+    const delta = { x: geometry.centroid.x - start.centroid.x, y: geometry.centroid.y - start.centroid.y };
+    if (Math.hypot(delta.x, delta.y) >= CAMERA_DRAG_THRESHOLD || activePointers.current.size > 1) start.dragged = true;
+    if (!start.dragged) return;
+    event.preventDefault();
+    suppressMapClick.current = true;
+    if (activePointers.current.size > 1 && start.distance > 0) {
+      const nextZoom = clampCameraZoomForMode(cameraMode, start.zoom * geometry.distance / start.distance);
+      const anchorWorld = {
+        x: (start.centroid.x - start.camera.x) / start.camera.scale,
+        y: (start.centroid.y - start.camera.y) / start.camera.scale,
+      };
+      const base = cameraFor(nextZoom);
+      const nextPan = normalizedCameraPan(nextZoom, cameraOffsetForAnchor(base, anchorWorld, geometry.centroid));
+      setCameraZoom(nextZoom);
+      setCameraPan(nextPan);
+    } else {
+      setCameraPan(normalizedCameraPan(start.zoom, { x: start.pan.x + delta.x, y: start.pan.y + delta.y }));
+    }
+  }
+
+  function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    activePointers.current.delete(event.pointerId);
+    if (activePointers.current.size) beginGesture();
+    else gesture.current = null;
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (modalOpen || (event.target as HTMLElement).closest("[data-camera-ui]")) return;
+    event.preventDefault();
+    const anchorScreen = localPointer(event);
+    const anchorWorld = { x: (anchorScreen.x - camera.x) / camera.scale, y: (anchorScreen.y - camera.y) / camera.scale };
+    const nextZoom = clampCameraZoomForMode(cameraMode, cameraZoom * Math.exp(-event.deltaY * 0.0015));
+    const base = cameraFor(nextZoom);
+    setCameraZoom(nextZoom);
+    setCameraPan(normalizedCameraPan(nextZoom, cameraOffsetForAnchor(base, anchorWorld, anchorScreen)));
+  }
+
+  function chooseCameraMode(mode: CameraMode) {
+    setCameraMode(mode);
+    setCameraPan({ x: 0, y: 0 });
+  }
 
   function screenToWorld(point: WorldPoint) {
     const viewport = viewportRef.current;
@@ -289,20 +381,20 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
         {visiting && <button type="button" onClick={onReturnHome} className="rounded-lg bg-[#ffe28a] px-2 py-1.5 text-xs font-bold text-[#4a2c12] sm:px-3 sm:py-2">Return Home</button>}
         <div className="flex rounded-lg border border-white/15 bg-[#252d27] p-0.5" aria-label="Camera mode">
           {(["overview", "follow"] as CameraMode[]).map((mode) => (
-            <button key={mode} type="button" onClick={() => setCameraMode(mode)} aria-pressed={cameraMode === mode} className={`rounded-md px-2 py-1 text-xs font-bold capitalize ${cameraMode === mode ? "bg-[#ffe28a] text-[#4a2c12]" : "text-[#e8eadf] hover:bg-white/10"}`}>
+            <button key={mode} type="button" onClick={() => chooseCameraMode(mode)} aria-pressed={cameraMode === mode} className={`rounded-md px-2 py-1 text-xs font-bold capitalize ${cameraMode === mode ? "bg-[#ffe28a] text-[#4a2c12]" : "text-[#e8eadf] hover:bg-white/10"}`}>
               {mode}
             </button>
           ))}
         </div>
         </div>
       </div>
-      <div ref={viewportRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
+      <div ref={viewportRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onWheel={handleWheel} onClickCapture={(event) => { if (suppressMapClick.current) { event.preventDefault(); event.stopPropagation(); suppressMapClick.current = false; } }} className="relative min-h-0 w-full flex-1 touch-none overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
           <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
           <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} reconnectingIds={reconnectingIds} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
-        {!visiting && <div className="sprout-world-bottom-controls pointer-events-none absolute z-40 flex flex-wrap items-end justify-between gap-1.5" aria-label="Farm quick actions">
+        {!visiting && <div data-camera-ui className="sprout-world-bottom-controls pointer-events-none absolute z-40 flex flex-wrap items-end justify-between gap-1.5" aria-label="Farm quick actions">
           <div className="pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-lg border border-[#765438] bg-[#fff8dc]/95 p-1 text-[#2f3e2f] shadow-lg" aria-label="Selected planting crop">
             {(Object.keys(crops) as CropType[]).map((cropKey) => <button key={cropKey} type="button" onClick={() => setSelectedCrop(cropKey)} aria-pressed={selectedCrop === cropKey} className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${selectedCrop === cropKey ? "bg-[#4f772d] text-white" : "bg-white/70"}`}>
               {crops[cropKey].name} · {seeds[cropKey]}

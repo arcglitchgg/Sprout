@@ -7,7 +7,7 @@ const source = readFileSync("lib/world-camera.ts", "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const loaded = { exports: {} };
 new Function("require", "module", "exports", outputText)(() => ({}), loaded, loaded.exports);
-const { getFollowCamera, getOverviewCamera, screenToCanonicalWorld } = loaded.exports;
+const { CAMERA_DRAG_THRESHOLD, CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM, cameraOffsetForAnchor, clampCameraZoom, clampCameraZoomForMode, getFollowCamera, getOverviewCamera, screenToCanonicalWorld } = loaded.exports;
 
 const world = { width: 1447, height: 1087 };
 
@@ -54,4 +54,44 @@ test("unusual aspect ratios increase Follow scale enough to cover the viewport",
     assert.ok(camera.x <= 0 && camera.x >= viewport.width - world.width * camera.scale);
     assert.ok(camera.y <= 0 && camera.y >= viewport.height - world.height * camera.scale);
   }
+});
+
+test("manual zoom is centralized and clamped", () => {
+  assert.equal(clampCameraZoom(0.2), CAMERA_MIN_ZOOM);
+  assert.equal(clampCameraZoom(3), CAMERA_MAX_ZOOM);
+  assert.equal(clampCameraZoomForMode("overview", CAMERA_MIN_ZOOM), 1);
+  assert.equal(clampCameraZoomForMode("follow", CAMERA_MIN_ZOOM), CAMERA_MIN_ZOOM);
+  assert.equal(CAMERA_DRAG_THRESHOLD, 6);
+});
+
+test("follow zoom and pan remain bounded without revealing empty world edges", () => {
+  const viewport = { width: 800, height: 600 };
+  const camera = getFollowCamera(world.width, world.height, viewport, { x: 700, y: 500 }, 1.25, { x: 10000, y: -10000 });
+  assert.equal(camera.x, 0);
+  assert.equal(camera.y, viewport.height - world.height * camera.scale);
+});
+
+test("overview preserves its whole-map baseline and pans only on zoomed axes", () => {
+  const viewport = { width: 800, height: 600 };
+  const normal = getOverviewCamera(world.width, world.height, viewport);
+  const belowNormal = getOverviewCamera(world.width, world.height, viewport, 0.75);
+  assert.deepEqual(belowNormal, normal);
+  const zoomed = getOverviewCamera(world.width, world.height, viewport, 1.6, { x: -100, y: 50 });
+  assert.ok(zoomed.scale > normal.scale);
+  assert.ok(zoomed.x <= 0 && zoomed.x >= viewport.width - world.width * zoomed.scale);
+  assert.ok(zoomed.y <= 0 && zoomed.y >= viewport.height - world.height * zoomed.scale);
+});
+
+test("zoom anchor offset keeps the same canonical point beneath the pointer", () => {
+  const viewport = { width: 800, height: 600 };
+  const target = { x: 700, y: 500 };
+  const current = getFollowCamera(world.width, world.height, viewport, target);
+  const screen = { x: 300, y: 220 };
+  const anchor = screenToCanonicalWorld(current, { x: 0, y: 0 }, screen);
+  const base = getFollowCamera(world.width, world.height, viewport, target, 1.3);
+  const pan = cameraOffsetForAnchor(base, anchor, screen);
+  const zoomed = getFollowCamera(world.width, world.height, viewport, target, 1.3, pan);
+  const converted = screenToCanonicalWorld(zoomed, { x: 0, y: 0 }, screen);
+  assert.ok(Math.abs(converted.x - anchor.x) < 0.0001);
+  assert.ok(Math.abs(converted.y - anchor.y) < 0.0001);
 });
