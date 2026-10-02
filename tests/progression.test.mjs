@@ -25,8 +25,25 @@ test("farm levels and unlocked plots follow every cumulative threshold", () => {
     assert.equal(progression.getUnlockedPlotCount(threshold), progression.FARM_LEVEL_PLOT_COUNTS[index]);
     if (threshold > 0) assert.equal(progression.getFarmLevel(threshold - 1), index);
   });
-  assert.equal(progression.getFarmLevel(50_000), 10);
+  assert.ok(progression.getFarmLevel(50_000) > 10);
   assert.equal(progression.getUnlockedPlotCount(50_000), 144);
+});
+
+test("prestige requirements continue indefinitely after the unchanged Level 10 threshold", () => {
+  assert.equal(progression.getFarmXpRequiredForNextLevel(10), 500);
+  assert.equal(progression.getFarmXpRequiredForNextLevel(11), 600);
+  assert.equal(progression.getFarmXpRequiredForNextLevel(12), 700);
+  assert.equal(progression.getFarmXpRequiredForNextLevel(50), 4_500);
+  assert.equal(progression.getCumulativeFarmXpForLevel(11), 2_100);
+  assert.equal(progression.getCumulativeFarmXpForLevel(12), 2_700);
+});
+
+test("large cumulative Farm XP resolves above Level 10 without changing plot rewards", () => {
+  assert.equal(progression.getFarmLevel(194_000), 67);
+  assert.deepEqual(progression.getFarmLevelProgress(194_000), { level: 67, current: 4_300, required: 6_200, percent: 4_300 / 6_200 * 100 });
+  assert.equal(progression.getUnlockedPlotCount(1_600), 144);
+  assert.equal(progression.getUnlockedPlotCount(194_000), 144);
+  assert.equal(progression.getUnlockedPlotCount(10_000_000), 144);
 });
 
 test("crossing several thresholds reports every level and aggregate unlock delta", () => {

@@ -25,7 +25,7 @@ export const GUIDE_TOPICS = [
     ],
   },
   { id: "getting-started", title: "Getting Started", body: "Buy seeds, plant unlocked plots, harvest crops, then sell them at the Market or awaken them at the Farmhouse." },
-  { id: "farming", title: "Farming", body: "Planting consumes one owned seed. Crops keep growing from their planted timestamp even while Sprout is closed." },
+  { id: "farming", title: "Farming", body: "Planting consumes one owned seed. Crops keep growing from their planted timestamp even while Sprout is closed. Farm Level continues beyond Level 10 for prestige; current gameplay unlocks stop at Level 10." },
   { id: "mutations", title: "Mutations", body: "Harvests can be Normal, Large, Golden, or Prismatic. Higher rarities sell for more and awaken into stronger fighters." },
   { id: "awakening", title: "Awakening", body: `Awaken harvested crops at the Farmhouse for Coins. The crop is consumed and becomes a Level 1 fighter with a random personality. ${awakeningCosts}` },
   { id: "fighters", title: "Fighters", body: "Species, rarity, personality, natural rolls, and level shape combat stats. Heavy Slam grows with HP, Backstab grows with Speed, and Kernel Burst scales heavily with ATK. Dungeon victories give XP only to the three participating fighters." },
@@ -43,6 +43,15 @@ export const GUIDE_TOPICS = [
 export type GuideTopicId = (typeof GUIDE_TOPICS)[number]["id"];
 
 export const PATCH_NOTES = [{
+  version: "Endless Farm Levels",
+  date: "October 2026",
+  bullets: [
+    "Farm Level now continues beyond Level 10",
+    "Existing Levels 1–10 and plot unlocks are unchanged",
+    "Levels above 10 are prestige-only for now",
+    "Existing accumulated Farm XP is fully preserved",
+  ],
+}, {
   version: "Roster & Progression QoL",
   date: "October 2026",
   bullets: [

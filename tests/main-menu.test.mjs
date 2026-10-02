@@ -48,7 +48,8 @@ test("patch notes are local, newest-first entries with concise bullets", () => {
   assert.ok(PATCH_NOTES.length > 0);
   assert.ok(PATCH_NOTES[0].version);
   assert.ok(PATCH_NOTES[0].date);
-  assert.equal(PATCH_NOTES[0].version, "Roster & Progression QoL");
+  assert.equal(PATCH_NOTES[0].version, "Endless Farm Levels");
+  assert.ok(PATCH_NOTES[0].bullets.some((bullet) => bullet.includes("prestige-only")));
   assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("beginner guide"))));
   assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("Active Team"))));
   assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("session renewal"))));

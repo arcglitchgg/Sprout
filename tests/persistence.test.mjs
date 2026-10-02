@@ -90,6 +90,14 @@ test("valid durable progress round-trips without transient state", () => {
   assert.equal("battle" in JSON.parse(storage.getItem(SAVE_KEY)), false);
 });
 
+test("large cumulative Farm XP round-trips without a save migration or clamp", () => {
+  const save = validSave();
+  save.game.farmXp = 194_000;
+  const storage = memoryStorage();
+  assert.equal(writeSproutSave(save, storage), true);
+  assert.equal(loadSproutSave(storage).save.game.farmXp, 194_000);
+});
+
 test("stored natural fighter stats round-trip exactly and are never rerolled", () => {
   const save = validSave();
   Object.assign(save.game.fighters[0], { hp: 183, attack: 21, defense: 33, speed: 19, level: 8, xp: 1080 });

@@ -1,4 +1,5 @@
 import "server-only";
+import { getFarmLevel } from "@/lib/progression";
 import type { SproutSaveV3 } from "@/lib/save-types";
 
 function config() {
@@ -38,7 +39,7 @@ export async function readCloudSave(userId: string): Promise<{ save: unknown; re
 export async function writeCloudSave(userId: string, save: SproutSaveV3, revision: number | null): Promise<{ revision: number; updatedAt: string } | "conflict"> {
   const response = await supabaseRequest("rpc/write_sprout_save", {
     method: "POST",
-    body: JSON.stringify({ p_user_id: userId, p_save: save, p_expected_revision: revision, p_farm_level: Math.min(10, [0, 40, 100, 180, 300, 450, 650, 900, 1200, 1600].filter((threshold) => save.game.farmXp >= threshold).length), p_coins: save.game.coins }),
+    body: JSON.stringify({ p_user_id: userId, p_save: save, p_expected_revision: revision, p_farm_level: getFarmLevel(save.game.farmXp), p_coins: save.game.coins }),
   });
   if (!response.ok) throw new Error("Cloud save write failed.");
   const result: unknown = await response.json();

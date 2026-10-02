@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import HarvestedCropCard from "@/components/HarvestedCropCard";
-import { selectAllMarketCrops, selectNormalMarketCrops, summarizeMarketSelection, toggleMarketSelection } from "@/lib/market";
-import type { HarvestedCrop } from "@/lib/game-types";
+import { clearMarketSelection, filterMarketCrops, getMarketSelectAllLabel, selectVisibleMarketCrops, summarizeMarketSelection, toggleMarketSelection } from "@/lib/market";
+import type { MarketMutationFilter, MarketSpeciesFilter } from "@/lib/market";
+import type { CropType, HarvestedCrop, HarvestMutationType } from "@/lib/game-types";
+
+const MUTATION_FILTERS: MarketMutationFilter[] = ["all", "normal", "large", "golden", "prismatic"];
+const SPECIES_FILTERS: MarketSpeciesFilter[] = ["all", "potato", "carrot", "corn"];
+const FILTER_LABELS: Record<"all" | CropType | HarvestMutationType, string> = { all: "All", normal: "Normal", large: "Large", golden: "Golden", prismatic: "Prismatic", potato: "Potato", carrot: "Carrot", corn: "Corn" };
 
 export default function WorldMarketOverlay({ coins, harvestedCrops, sellCrops, onClose }: {
   coins: number;
@@ -13,7 +18,11 @@ export default function WorldMarketOverlay({ coins, harvestedCrops, sellCrops, o
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmingRareSale, setConfirmingRareSale] = useState(false);
+  const [mutationFilter, setMutationFilter] = useState<MarketMutationFilter>("all");
+  const [speciesFilter, setSpeciesFilter] = useState<MarketSpeciesFilter>("all");
   const summary = summarizeMarketSelection(harvestedCrops, selectedIds);
+  const visibleCrops = filterMarketCrops(harvestedCrops, mutationFilter, speciesFilter);
+  const selectAllLabel = getMarketSelectAllLabel(mutationFilter, speciesFilter);
 
   function replaceSelection(ids: string[]) {
     setSelectedIds(ids);
@@ -54,11 +63,14 @@ export default function WorldMarketOverlay({ coins, harvestedCrops, sellCrops, o
         </header>
 
         {harvestedCrops.length > 0 && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#765438]/25 bg-[#e5cf98] px-3 py-2">
-            <button type="button" onClick={() => replaceSelection(selectAllMarketCrops(harvestedCrops))} className="rounded-lg bg-[#fff8dc] px-3 py-1.5 text-xs font-bold">Select All</button>
-            <button type="button" onClick={() => replaceSelection(selectNormalMarketCrops(harvestedCrops))} className="rounded-lg bg-[#fff8dc] px-3 py-1.5 text-xs font-bold">Select Normal</button>
-            <button type="button" onClick={() => replaceSelection([])} disabled={!summary.count} className="rounded-lg bg-[#fff8dc] px-3 py-1.5 text-xs font-bold disabled:opacity-40">Clear</button>
-            <span className="ml-auto text-sm font-black tabular-nums">Selected value: 🪙 {summary.total}</span>
+          <div className="shrink-0 space-y-2 border-b border-[#765438]/25 bg-[#e5cf98] px-3 py-2">
+            <div className="flex flex-wrap gap-1.5" aria-label="Mutation filter">{MUTATION_FILTERS.map((value) => <button key={value} type="button" aria-pressed={mutationFilter === value} onClick={() => setMutationFilter(value)} className={`rounded-full px-2.5 py-1 text-xs font-bold ${mutationFilter === value ? "bg-[#4f772d] text-white" : "bg-[#fff8dc]"}`}>{FILTER_LABELS[value]}</button>)}</div>
+            <div className="flex flex-wrap gap-1.5" aria-label="Crop species filter">{SPECIES_FILTERS.map((value) => <button key={value} type="button" aria-pressed={speciesFilter === value} onClick={() => setSpeciesFilter(value)} className={`rounded-full px-2.5 py-1 text-xs font-bold ${speciesFilter === value ? "bg-[#765438] text-white" : "bg-[#fff8dc]"}`}>{value === "all" ? "All Crops" : FILTER_LABELS[value]}</button>)}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => replaceSelection(selectVisibleMarketCrops(harvestedCrops, selectedIds, mutationFilter, speciesFilter))} disabled={!visibleCrops.length} className="rounded-lg bg-[#fff8dc] px-3 py-1.5 text-xs font-bold disabled:opacity-40">{selectAllLabel}</button>
+              {summary.count > 0 && <button type="button" onClick={() => replaceSelection(clearMarketSelection())} className="rounded-lg bg-[#fff8dc] px-3 py-1.5 text-xs font-bold">Clear Selection</button>}
+              <span className="text-sm font-black tabular-nums sm:ml-auto">Selected: {summary.count} · 🪙 {summary.total}</span>
+            </div>
           </div>
         )}
 
@@ -66,11 +78,11 @@ export default function WorldMarketOverlay({ coins, harvestedCrops, sellCrops, o
           {harvestedCrops.length === 0 ? (
             <div className="rounded-xl bg-[#fff8dc] p-5 text-center text-sm opacity-70">Harvested crops will appear here when they are ready to sell.</div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {harvestedCrops.map((item) => (
+            visibleCrops.length ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {visibleCrops.map((item) => (
                 <HarvestedCropCard key={item.id} item={item} selected={selectedIds.includes(item.id)} onSelect={(itemId) => replaceSelection(toggleMarketSelection(selectedIds, itemId))} />
               ))}
-            </div>
+            </div> : <div className="rounded-xl bg-[#fff8dc] p-5 text-center text-sm opacity-70">No harvested crops match these filters.</div>
           )}
         </div>
 

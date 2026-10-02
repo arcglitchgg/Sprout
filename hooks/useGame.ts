@@ -61,10 +61,11 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     setFarmXp(nextXp);
     const crossed = getCrossedLevels(previousXp, nextXp);
     if (crossed.length) {
+      const unlockedPlots = getUnlockedPlotCount(nextXp) - getUnlockedPlotCount(previousXp);
       notify?.({
         kind: "level-up",
         title: `Farm Level ${crossed[crossed.length - 1]}!`,
-        detail: `+${getUnlockedPlotCount(nextXp) - getUnlockedPlotCount(previousXp)} plots unlocked`,
+        detail: unlockedPlots > 0 ? `+${unlockedPlots} plots unlocked` : "Prestige level — current gameplay unlocks remain complete.",
       });
     }
   }, [notify]);
