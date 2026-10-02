@@ -52,3 +52,29 @@ test("Active Team changes do not alter the independent Defense Team", () => {
   assert.deepEqual(defense.map((entry) => entry.id), ["spare", "left"]);
   assert.deepEqual(active, ["front", "left", "right"]);
 });
+
+test("legacy Active Team migrates to Team 1 and exactly one preset is default", () => {
+  const presets = teams.normalizeTeamPresets(undefined, ["front", "left", "right"], roster);
+  assert.deepEqual(teams.presetToActiveTeam(presets[0]), ["front", "left", "right"]);
+  assert.deepEqual(teams.presetToActiveTeam(presets[1]), [null, null, null]);
+  assert.equal(teams.normalizeDefaultTeamPreset(undefined), 0);
+});
+
+test("presets are independent copies and can be renamed", () => {
+  const presets = teams.normalizeTeamPresets(undefined, teams.EMPTY_ACTIVE_TEAM, roster);
+  const updated = teams.updateTeamPreset(presets, 1, ["front", "left", "right"], roster);
+  const renamed = teams.renameTeamPreset(updated, 1, "  Speed Team  ");
+  assert.equal(renamed[1].name, "Speed Team");
+  assert.deepEqual(teams.presetToActiveTeam(renamed[0]), [null, null, null]);
+  assert.equal(teams.renameTeamPreset(renamed, 1, ""), null);
+});
+
+test("removing a fighter cleans every preset", () => {
+  const presets = [
+    { name: "A", front: "front", rearLeft: "left", rearRight: "right" },
+    { name: "B", front: "spare", rearLeft: "left", rearRight: null },
+    { name: "C", front: "left", rearLeft: null, rearRight: null },
+  ];
+  const cleaned = teams.clearMissingPresetIds(presets, roster.filter((entry) => entry.id !== "left"));
+  assert.deepEqual(cleaned.map(teams.presetToActiveTeam), [["front", null, "right"], ["spare", null, null], [null, null, null]]);
+});

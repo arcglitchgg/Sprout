@@ -2,7 +2,7 @@ import { FIRST_WORLD } from "@/lib/world-data";
 import { TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { getLevelFromXp } from "@/lib/fighter-progression";
 import { FIGHTER_NATURAL_STAT_RANGES } from "@/lib/fighters";
-import { normalizeActiveTeam } from "@/lib/team-selection";
+import { getDefaultPresetTeam, normalizeActiveTeam, normalizeDefaultTeamPreset, normalizeTeamPresets } from "@/lib/team-selection";
 import type { CropType, HarvestMutationType, MutationType, PersonalityType, Plot } from "@/lib/game-types";
 import type { SproutSaveV1, SproutSaveV2, SproutSaveV3 } from "@/lib/save-types";
 
@@ -83,6 +83,8 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
     if (![fighter.hp, fighter.attack, fighter.defense, fighter.speed].every(isFiniteNonnegative)) return false;
     if (fighter.naturalStats !== undefined && !validNaturalStats(fighter.naturalStats, fighter.crop as CropType)) return false;
     if (fighter.locked !== undefined && typeof fighter.locked !== "boolean") return false;
+    if (fighter.favorite !== undefined && typeof fighter.favorite !== "boolean") return false;
+    if (fighter.name !== undefined && (typeof fighter.name !== "string" || !fighter.name.trim() || fighter.name.length > 20 || /[\r\n]/.test(fighter.name))) return false;
     if (requireFighterProgression && (!Number.isSafeInteger(fighter.level) || (fighter.level as number) < 1 || !Number.isSafeInteger(fighter.xp) || (fighter.xp as number) < 0 || fighter.level !== getLevelFromXp(fighter.xp as number))) return false;
     fighterIds.add(fighter.id);
   }
@@ -90,6 +92,11 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   if (requireFighterProgression && game.activeTeam !== undefined) {
     if (!Array.isArray(game.activeTeam) || game.activeTeam.length !== 3 || game.activeTeam.some((id) => id !== null && typeof id !== "string")) return false;
   }
+  if (requireFighterProgression && game.teamPresets !== undefined) {
+    if (!Array.isArray(game.teamPresets) || game.teamPresets.length !== 3 || game.teamPresets.some((preset) => !isRecord(preset) || typeof preset.name !== "string" || !preset.name.trim() || preset.name.length > 20 || [preset.front, preset.rearLeft, preset.rearRight].some((id) => id !== null && typeof id !== "string"))) return false;
+  }
+  if (requireFighterProgression && game.defaultTeamPreset !== undefined && game.defaultTeamPreset !== 0 && game.defaultTeamPreset !== 1 && game.defaultTeamPreset !== 2) return false;
+  if (requireFighterProgression && game.ascendantShards !== undefined && (!Number.isSafeInteger(game.ascendantShards) || (game.ascendantShards as number) < 0)) return false;
 
   return validFarmerTile(value.world.farmerTile) && (value.world.facing === "left" || value.world.facing === "right");
 }
@@ -141,10 +148,13 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
       plots: value.game.plots.map((plot) => ({ ...plot })),
       harvestedCrops: value.game.harvestedCrops.map((item) => ({ ...item })),
       collection: value.game.collection.map((entry) => ({ ...entry })),
-      fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0, locked: false })),
+      fighters: value.game.fighters.map((fighter) => ({ ...fighter, level: 1, xp: 0, locked: false, favorite: false })),
       ascensionPity: value.game.ascensionPity ? { ...value.game.ascensionPity } : undefined,
       dungeon: { highestClearedFloor: 0 },
       activeTeam: [null, null, null],
+      teamPresets: normalizeTeamPresets(undefined, [null, null, null], []),
+      defaultTeamPreset: 0,
+      ascendantShards: 0,
     },
     world: { farmerTile: { ...value.world.farmerTile }, facing: value.world.facing },
   };
@@ -152,14 +162,12 @@ export function migrateV2ToV3(value: unknown): SproutSaveV3 | null {
 }
 
 export function migrateSproutSave(value: unknown): SproutSaveV3 | null {
-  if (validateSproutSave(value)) return {
-    ...value,
-    game: {
-      ...value.game,
-      fighters: value.game.fighters.map((fighter) => ({ ...fighter, locked: fighter.locked ?? false })),
-      activeTeam: normalizeActiveTeam(value.game.activeTeam, value.game.fighters),
-    },
-  };
+  if (validateSproutSave(value)) {
+    const fighters = value.game.fighters.map((fighter) => ({ ...fighter, locked: fighter.locked ?? false, favorite: fighter.favorite ?? false }));
+    const teamPresets = normalizeTeamPresets(value.game.teamPresets, value.game.activeTeam, fighters);
+    const defaultTeamPreset = normalizeDefaultTeamPreset(value.game.defaultTeamPreset);
+    return { ...value, game: { ...value.game, fighters, teamPresets, defaultTeamPreset, ascendantShards: value.game.ascendantShards ?? 0, activeTeam: getDefaultPresetTeam(teamPresets, defaultTeamPreset) } };
+  }
   if (!isRecord(value)) return null;
   if (value.version === 1) {
     const v2 = migrateV1ToV2(value);

@@ -34,21 +34,32 @@ test("team tagline is deterministic and composition-aware", () => {
 test("guide catalog contains the requested destinations with unique IDs", () => {
   const ids = GUIDE_TOPICS.map((topic) => topic.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const id of ["getting-started", "farming", "mutations", "awakening", "fighters", "personalities", "fusion", "ascension", "active-team", "dungeon", "pvp", "defense-team"]) assert.ok(ids.includes(id));
+  assert.equal(ids[0], "how-to-play");
+  for (const id of ["how-to-play", "getting-started", "farming", "mutations", "awakening", "fighters", "personalities", "fusion", "ascension", "active-team", "dungeon", "pvp", "defense-team"]) assert.ok(ids.includes(id));
+  const tutorial = GUIDE_TOPICS[0];
+  assert.equal(tutorial.title, "How to Play Sprout");
+  assert.equal(tutorial.sections.length, 11);
+  for (const phrase of ["Harvest All", "✦ MAX", "Active Team", "20", "Ascended", "PvP"]) assert.ok(JSON.stringify(tutorial).includes(phrase));
+  assert.ok(JSON.stringify(tutorial).includes("Normal 20, Large 40, Golden 100, and Prismatic 250 Coins"));
+  assert.ok(JSON.stringify(tutorial).includes("Prismatic → Ascended 35%"));
 });
 
 test("patch notes are local, newest-first entries with concise bullets", () => {
   assert.ok(PATCH_NOTES.length > 0);
   assert.ok(PATCH_NOTES[0].version);
   assert.ok(PATCH_NOTES[0].date);
-  assert.ok(PATCH_NOTES[0].bullets.some((bullet) => bullet.includes("Active Team")));
-  assert.ok(PATCH_NOTES[0].bullets.some((bullet) => bullet.includes("session renewal")));
+  assert.equal(PATCH_NOTES[0].version, "Roster & Progression QoL");
+  assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("beginner guide"))));
+  assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("Active Team"))));
+  assert.ok(PATCH_NOTES.some((entry) => entry.bullets.some((bullet) => bullet.includes("session renewal"))));
 });
 
 test("Main Menu sections and contextual guide links are wired", () => {
   const main = readFileSync("components/MainMenu.tsx", "utf8");
   for (const section of ["active-team", "guides", "patch-notes", "account"]) assert.ok(main.includes(`"${section}"`));
   assert.ok(main.includes('initialGuide ? "guides" : "active-team"'));
+  assert.ok(main.includes('initialGuide ?? "how-to-play"'));
+  assert.ok(main.includes('"sections" in topic'));
   const world = readFileSync("components/PixelWorld.tsx", "utf8");
   assert.match(world, /function openGuide\(topic[\s\S]*closeInteraction\(\);[\s\S]*onOpenGuide\(topic\)/);
   const linked = [readFileSync("components/WorldFarmhouseOverlay.tsx", "utf8"), readFileSync("components/WorldDungeonOverlay.tsx", "utf8"), readFileSync("components/WorldFriendsOverlay.tsx", "utf8")].join("\n");

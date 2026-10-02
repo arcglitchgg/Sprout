@@ -1,22 +1,24 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import TeamSelector from "@/components/TeamSelector";
 import FighterCard from "@/components/FighterCard";
 import FriendlyBattle from "@/components/FriendlyBattle";
 import { socialRequest } from "@/lib/social-client";
-import type { ActiveTeam, Fighter } from "@/lib/game-types";
+import type { Fighter, TeamPresetIndex, TeamPresets } from "@/lib/game-types";
 import type { LivePvpMatch } from "@/lib/pvp-types";
 import { shouldCancelSetupOnLeave, validPvpTeamSelection } from "@/lib/pvp";
-import { getDefaultBattleSelection, validActiveTeamSelection } from "@/lib/team-selection";
+import { getDefaultBattleSelection, getDefaultPresetTeam, presetToActiveTeam, validActiveTeamSelection } from "@/lib/team-selection";
 
-export default function WorldPvpOverlay({ session, localId, opponentId, opponentName, challengeId, presentIds, fighters, activeTeam, onClose }: {
+export default function WorldPvpOverlay({ session, localId, opponentId, opponentName, challengeId, presentIds, fighters, teamPresets, defaultTeamPreset, onClose }: {
   session: string; localId: string; opponentId: string; opponentName: string; challengeId: string;
-  presentIds: string[]; fighters: Fighter[]; activeTeam: ActiveTeam; onClose: () => void;
+  presentIds: string[]; fighters: Fighter[]; teamPresets: TeamPresets; defaultTeamPreset: TeamPresetIndex; onClose: () => void;
 }) {
   const [match, setMatch] = useState<LivePvpMatch | null>(null);
+  const activeTeam = getDefaultPresetTeam(teamPresets, defaultTeamPreset);
   const activeTeamValid = validActiveTeamSelection(activeTeam, fighters);
   const [selected, setSelected] = useState<string[]>(() => getDefaultBattleSelection(activeTeam, fighters));
+  const [teamSource, setTeamSource] = useState<string>(activeTeamValid ? String(defaultTeamPreset) : "manual");
   const [choosingTeam, setChoosingTeam] = useState(!activeTeamValid);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,6 +58,12 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not ready your team."); }
     finally { setBusy(false); }
   }
+  function chooseSource(value: string) {
+    setTeamSource(value);
+    if (value === "manual") { setChoosingTeam(true); return; }
+    const team = presetToActiveTeam(teamPresets[Number(value) as TeamPresetIndex]);
+    if (validActiveTeamSelection(team, fighters)) { setSelected([...team]); setChoosingTeam(false); } else setChoosingTeam(true);
+  }
 
   async function cancel() {
     if (!ready) await socialRequest(session, `/api/pvp/matches/${challengeId}`, "DELETE").catch(() => {});
@@ -69,10 +77,11 @@ export default function WorldPvpOverlay({ session, localId, opponentId, opponent
         <h2 className="text-xl font-black">Friendly PvP vs {opponentName}</h2>
         <p className="text-sm">Choose three fighters. Both players must ready before battle starts.</p>
         {error && <p role="alert" className="mt-2 font-bold text-[#9b3d25]">{error}</p>}
-        {!submitted && !ended && match?.status === "waiting_for_teams" && <>{!choosingTeam && valid ? <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Active Team</strong><button type="button" onClick={() => setChoosingTeam(true)} className="text-sm font-bold underline">Choose Different Team</button></div></div> : <TeamSelector fighters={fighters} selected={selected} onSelect={setSelected} locked={busy} />}{!activeTeamValid && activeTeam.some(Boolean) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating. Choose a team for this match.</p>}<div className="mt-3 grid gap-2 sm:grid-cols-3">{selected.map((id, slot) => { const fighter = fighters.find((entry) => entry.id === id); return fighter ? <div key={`${slot}:${id}`}><p className="mb-1 text-xs font-black">{slot === 0 ? "Front" : slot === 1 ? "Rear Left" : "Rear Right"}</p><FighterCard fighter={fighter} /></div> : null; })}</div><button type="button" disabled={!valid || busy} onClick={() => void submit()} className="mt-3 rounded-lg bg-[#4f772d] px-4 py-2 font-bold text-white disabled:opacity-40">Ready</button></>}
+        {!submitted && !ended && match?.status === "waiting_for_teams" && <><label className="mt-3 block text-sm font-bold">Team source<select value={teamSource} onChange={(event) => chooseSource(event.target.value)} className="mt-1 block w-full rounded-lg bg-[#fff8dc] p-2"><option value="manual">Manual</option>{teamPresets.map((preset, index) => <option key={index} value={index}>{preset.name}{index === defaultTeamPreset ? " · Default" : ""}</option>)}</select></label>{!choosingTeam && valid ? <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Active Team</strong><button type="button" onClick={() => setChoosingTeam(true)} className="text-sm font-bold underline">Choose Different Team</button></div></div> : <TeamSelector fighters={fighters} selected={selected} onSelect={setSelected} locked={busy} />}{!activeTeamValid && activeTeam.some(Boolean) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating. Choose a team for this match.</p>}<div className="mt-3 grid gap-2 sm:grid-cols-3">{selected.map((id, slot) => { const fighter = fighters.find((entry) => entry.id === id); return fighter ? <div key={`${slot}:${id}`}><p className="mb-1 text-xs font-black">{slot === 0 ? "Front" : slot === 1 ? "Rear Left" : "Rear Right"}</p><FighterCard fighter={fighter} /></div> : null; })}</div><button type="button" disabled={!valid || busy} onClick={() => void submit()} className="mt-3 rounded-lg bg-[#4f772d] px-4 py-2 font-bold text-white disabled:opacity-40">Ready</button></>}
         {submitted && !error && <p className="mt-3 font-bold">Waiting for {opponentName} to ready...</p>}
         {!match && !error && <p className="mt-3">Loading match...</p>}
         <button type="button" onClick={() => void cancel()} className="ml-2 mt-3 rounded-lg border border-[#765438] px-4 py-2 font-bold">Cancel</button>
       </div>}
   </div>;
 }
+

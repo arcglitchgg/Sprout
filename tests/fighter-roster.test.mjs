@@ -57,3 +57,19 @@ test("release confirmation counts protect Prismatic and Ascended twice", () => {
   assert.equal(roster.getReleaseConfirmationCount("prismatic"), 2);
   assert.equal(roster.getReleaseConfirmationCount("ascended"), 2);
 });
+
+test("fighter names trim, validate, and preserve the roster", () => {
+  const fighters = [fighter("one")];
+  assert.equal(roster.renameRosterFighter(fighters, "one", "  Tater Tot  ")[0].name, "Tater Tot");
+  assert.equal(roster.renameRosterFighter(fighters, "one", ""), null);
+  assert.equal(roster.renameRosterFighter(fighters, "one", "line\nbreak"), null);
+  assert.equal(roster.renameRosterFighter(fighters, "one", "x".repeat(21)), null);
+});
+
+test("favorite is independent from lock and combined filters compose", () => {
+  const fighters = [fighter("one", "golden", "corn"), fighter("two", "large", "corn"), fighter("three", "golden", "potato")];
+  const favorite = roster.setRosterFighterFavorite(fighters, "one", true);
+  assert.equal(favorite[0].locked, false);
+  assert.deepEqual(roster.filterFighterRoster(favorite, "favorites", "corn").map((entry) => entry.id), ["one"]);
+  assert.deepEqual(roster.filterFighterRoster(favorite, "golden", "corn").map((entry) => entry.id), ["one"]);
+});

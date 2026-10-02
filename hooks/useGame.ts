@@ -11,9 +11,10 @@ import { fuseFighters as createFusion, INITIAL_ASCENSION_PITY } from "@/lib/fusi
 import { harvestPlot, harvestReadyPlots, sellHarvestedCrop, sellHarvestedCrops } from "@/lib/inventory";
 import { FARM_XP_REWARDS, getCrossedLevels, getFarmLevel, getUnlockedPlotCount, TOTAL_FARM_PLOTS } from "@/lib/progression";
 import { INITIAL_SEEDS, plantWithSeed, purchaseSeed } from "@/lib/seeds";
-import { releaseRosterFighter, setRosterFighterLocked } from "@/lib/fighter-roster";
-import { EMPTY_ACTIVE_TEAM, normalizeActiveTeam, updateActiveTeam } from "@/lib/team-selection";
-import type { ActiveTeam, AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory } from "@/lib/game-types";
+import { releaseRosterFighter, renameRosterFighter, setRosterFighterFavorite, setRosterFighterLocked } from "@/lib/fighter-roster";
+import { dismantleAscendedFighter } from "@/lib/ascendant-shards";
+import { clearMissingPresetIds, getDefaultPresetTeam, normalizeDefaultTeamPreset, normalizeTeamPresets, renameTeamPreset as renamePreset, updateTeamPreset } from "@/lib/team-selection";
+import type { AscensionPity, CollectionEntry, CropType, Fighter, HarvestedCrop, Plot, SeedInventory, TeamPresetIndex } from "@/lib/game-types";
 import type { SproutGameSaveV3 } from "@/lib/save-types";
 import type { WorldNotification } from "@/components/WorldNotifications";
 
@@ -30,7 +31,9 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
   const [collection, setCollection] = useState<CollectionEntry[]>(() => initial ? initial.collection.map((entry) => ({ ...entry })) : []);
   const [harvestedCrops, setHarvestedCrops] = useState<HarvestedCrop[]>(() => initial ? initial.harvestedCrops.map((item) => ({ ...item })) : []);
   const [fighters, setFighters] = useState<Fighter[]>(() => initial ? initial.fighters.map((fighter) => ({ ...fighter })) : []);
-  const [activeTeam, setActiveTeamState] = useState<ActiveTeam>(() => initial ? normalizeActiveTeam(initial.activeTeam, initial.fighters) : [...EMPTY_ACTIVE_TEAM]);
+  const [teamPresets, setTeamPresetsState] = useState(() => normalizeTeamPresets(initial?.teamPresets, initial?.activeTeam, initial?.fighters ?? []));
+  const [defaultTeamPreset, setDefaultTeamPresetState] = useState<TeamPresetIndex>(() => normalizeDefaultTeamPreset(initial?.defaultTeamPreset));
+  const [ascendantShards, setAscendantShards] = useState(initial?.ascendantShards ?? 0);
   const [ascensionPity, setAscensionPity] = useState<AscensionPity>(() => ({ ...INITIAL_ASCENSION_PITY, ...initial?.ascensionPity }));
   const [dungeon, setDungeon] = useState(() => initial?.dungeon ? structuredClone(initial.dungeon) : { ...INITIAL_DUNGEON_PROGRESS });
   const coinsRef = useRef(coins);
@@ -40,12 +43,15 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
   const harvestedCropsRef = useRef(harvestedCrops);
   const collectionRef = useRef(collection);
   const fightersRef = useRef(fighters);
-  const activeTeamRef = useRef(activeTeam);
+  const teamPresetsRef = useRef(teamPresets);
+  const defaultTeamPresetRef = useRef(defaultTeamPreset);
+  const ascendantShardsRef = useRef(ascendantShards);
   const dungeonRef = useRef(dungeon);
   const ascensionPityRef = useRef(ascensionPity);
 
   const farmLevel = getFarmLevel(farmXp);
   const unlockedPlotCount = getUnlockedPlotCount(farmXp);
+  const activeTeam = getDefaultPresetTeam(teamPresets, defaultTeamPreset);
 
   const awardFarmXp = useCallback((amount: number) => {
     if (amount <= 0) return;
@@ -206,11 +212,11 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     const fusion = createFusion(fightersRef.current, selectedIds, Math.random, ascensionPityRef.current);
     if (!fusion) return null;
     fightersRef.current = fusion.remaining;
-    const cleanedTeam = normalizeActiveTeam(activeTeamRef.current, fusion.remaining);
-    activeTeamRef.current = cleanedTeam;
+    const cleanedPresets = clearMissingPresetIds(teamPresetsRef.current, fusion.remaining);
+    teamPresetsRef.current = cleanedPresets;
     ascensionPityRef.current = fusion.pity;
     setFighters(fusion.remaining);
-    setActiveTeamState(cleanedTeam);
+    setTeamPresetsState(cleanedPresets);
     setAscensionPity(fusion.pity);
     return fusion.result;
   }
@@ -223,24 +229,50 @@ export function useGame(initial?: SproutGameSaveV3, notify?: Notify) {
     return true;
   }
 
+  function setFighterFavorite(fighterId: string, favorite: boolean) {
+    const next = setRosterFighterFavorite(fightersRef.current, fighterId, favorite);
+    if (!next) return false;
+    fightersRef.current = next; setFighters(next); return true;
+  }
+
+  function renameFighter(fighterId: string, name: string) {
+    const next = renameRosterFighter(fightersRef.current, fighterId, name);
+    if (!next) return false;
+    fightersRef.current = next; setFighters(next); return true;
+  }
+
   function releaseFighter(fighterId: string) {
     const result = releaseRosterFighter(fightersRef.current, fighterId);
     if (!result) return false;
     fightersRef.current = result.remaining;
-    const cleanedTeam = normalizeActiveTeam(activeTeamRef.current, result.remaining);
-    activeTeamRef.current = cleanedTeam;
+    const cleanedPresets = clearMissingPresetIds(teamPresetsRef.current, result.remaining);
+    teamPresetsRef.current = cleanedPresets;
     setFighters(result.remaining);
-    setActiveTeamState(cleanedTeam);
+    setTeamPresetsState(cleanedPresets);
     return true;
   }
 
-  function setActiveTeam(selectedIds: string[]) {
-    const next = updateActiveTeam(activeTeamRef.current, selectedIds, fightersRef.current);
+  function setTeamPreset(index: TeamPresetIndex, selectedIds: string[]) {
+    const next = updateTeamPreset(teamPresetsRef.current, index, selectedIds, fightersRef.current);
     if (!next) return false;
-    activeTeamRef.current = next;
-    setActiveTeamState(next);
+    teamPresetsRef.current = next;
+    setTeamPresetsState(next);
     return true;
   }
 
-  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, activeTeam, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, setFighterLocked, releaseFighter, setActiveTeam, awardDungeonVictory };
+  function renameTeamPreset(index: TeamPresetIndex, name: string) {
+    const next = renamePreset(teamPresetsRef.current, index, name);
+    if (!next) return false;
+    teamPresetsRef.current = next; setTeamPresetsState(next); return true;
+  }
+  function setDefaultTeamPreset(index: TeamPresetIndex) { defaultTeamPresetRef.current = index; setDefaultTeamPresetState(index); }
+  function setActiveTeam(selectedIds: string[]) { return setTeamPreset(defaultTeamPresetRef.current, selectedIds); }
+  function dismantleFighter(fighterId: string) {
+    const result = dismantleAscendedFighter(fightersRef.current, teamPresetsRef.current, ascendantShardsRef.current, fighterId);
+    if (!result) return false;
+    fightersRef.current = result.remaining; teamPresetsRef.current = result.presets; ascendantShardsRef.current = result.shards;
+    setFighters(result.remaining); setTeamPresetsState(result.presets); setAscendantShards(result.shards); return true;
+  }
+
+  return { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrop, sellCrops, awakenCrop, fuseFighters, setFighterLocked, setFighterFavorite, renameFighter, releaseFighter, dismantleFighter, setActiveTeam, setTeamPreset, renameTeamPreset, setDefaultTeamPreset, awardDungeonVictory };
 }

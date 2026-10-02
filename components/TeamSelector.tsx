@@ -1,4 +1,4 @@
-import { FORMATION } from "@/lib/battle-data";
+﻿import { FORMATION } from "@/lib/battle-data";
 import { crops, mutations, personalities } from "@/lib/game-data";
 import { getEffectiveFighter } from "@/lib/fighter-progression";
 import type { Fighter } from "@/lib/game-types";
@@ -19,7 +19,7 @@ export default function TeamSelector({ fighters, selected, onSelect, locked }: P
             {fighters.map((fighter, rosterIndex) => {
               const effective = getEffectiveFighter(fighter);
               return <option key={fighter.id} value={fighter.id} disabled={selected.includes(fighter.id) && selected[index] !== fighter.id}>
-                #{rosterIndex + 1} Lv. {fighter.level} {mutations[fighter.mutation].name} {crops[fighter.crop].name} — {personalities[fighter.personality].name} (HP {effective.hp}, ATK {effective.attack}, DEF {effective.defense}, SPD {effective.speed})
+                #{rosterIndex + 1} {fighter.name ? `${fighter.name} · ` : ""}Lv. {fighter.level} {mutations[fighter.mutation].name} {crops[fighter.crop].name} — {personalities[fighter.personality].name} (HP {effective.hp}, ATK {effective.attack}, DEF {effective.defense}, SPD {effective.speed})
               </option>;
             })}
           </select>
@@ -28,3 +28,4 @@ export default function TeamSelector({ fighters, selected, onSelect, locked }: P
     </fieldset>
   );
 }
+

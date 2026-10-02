@@ -14,7 +14,7 @@ function load(name) {
   return loaded.exports;
 }
 
-const { awardFighterXp, FIGHTER_GROWTH_CEILINGS, getEffectiveFighter, getFighterStatMultiplier, getLevelFromXp, getXpRequiredForNextLevel } = load("@/lib/fighter-progression");
+const { awardFighterXp, FIGHTER_GROWTH_CEILINGS, getEffectiveFighter, getFighterStatMultiplier, getFighterXpProgress, getLevelFromXp, getXpRequiredForNextLevel } = load("@/lib/fighter-progression");
 const { FIGHTER_NATURAL_STAT_RANGES, generateFighter } = load("@/lib/fighters");
 
 const fighter = { id: "base", crop: "potato", mutation: "normal", personality: "protective", hp: 130, attack: 20, defense: 35, speed: 20, level: 1, xp: 0 };
@@ -75,4 +75,9 @@ test("newly generated fighters start at level 1 with zero XP", () => {
   const generated = generateFighter({ crop: "corn", mutation: "ascended" }, () => 0.2);
   assert.equal(generated.level, 1);
   assert.equal(generated.xp, 0);
+});
+
+test("XP progress reports cumulative XP within the current level", () => {
+  assert.deepEqual(getFighterXpProgress({ level: 1, xp: 25 }), { current: 25, required: 50, percent: 50 });
+  assert.deepEqual(getFighterXpProgress({ level: 2, xp: 70 }), { current: 20, required: 80, percent: 25 });
 });

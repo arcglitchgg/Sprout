@@ -26,6 +26,22 @@ export function setRosterFighterLocked(fighters: Fighter[], fighterId: string, l
   return fighters.map((fighter, fighterIndex) => fighterIndex === index ? { ...fighter, locked } : fighter);
 }
 
+export type RosterRarityFilter = "all" | "favorites" | MutationType;
+export type RosterSpeciesFilter = "all" | CropType;
+export function filterFighterRoster(fighters: Fighter[], rarity: RosterRarityFilter, species: RosterSpeciesFilter) {
+  return fighters.filter((fighter) => (rarity === "all" || rarity === "favorites" ? rarity !== "favorites" || fighter.favorite === true : fighter.mutation === rarity) && (species === "all" || fighter.crop === species));
+}
+export function renameRosterFighter(fighters: Fighter[], fighterId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 20 || /[\r\n]/.test(name)) return null;
+  if (!fighters.some((fighter) => fighter.id === fighterId)) return null;
+  return fighters.map((fighter) => fighter.id === fighterId ? { ...fighter, name: trimmed } : fighter);
+}
+export function setRosterFighterFavorite(fighters: Fighter[], fighterId: string, favorite: boolean) {
+  if (!fighters.some((fighter) => fighter.id === fighterId)) return null;
+  return fighters.map((fighter) => fighter.id === fighterId ? { ...fighter, favorite } : fighter);
+}
+
 export function releaseRosterFighter(fighters: Fighter[], fighterId: string) {
   const fighter = fighters.find((entry) => entry.id === fighterId);
   if (!fighter || fighter.locked) return null;

@@ -8,13 +8,15 @@ import { createDungeonEnemyTeam, getDungeonFloorXp, getHighestUnlockedDungeonFlo
 import { crops, personalities } from "@/lib/game-data";
 import type { BattleState } from "@/lib/battle-types";
 import type { DungeonVictoryReward } from "@/lib/dungeon";
-import type { ActiveTeam, Fighter } from "@/lib/game-types";
+import type { Fighter, TeamPresetIndex, TeamPresets } from "@/lib/game-types";
+import { getDefaultPresetTeam } from "@/lib/team-selection";
 import type { DungeonProgress } from "@/lib/save-types";
 import type { GuideTopicId } from "@/lib/guide-data";
 
-export default function WorldDungeonOverlay({ fighters, activeTeam, progress, onVictory, onHelp, onClose }: {
+export default function WorldDungeonOverlay({ fighters, teamPresets, defaultTeamPreset, progress, onVictory, onHelp, onClose }: {
   fighters: Fighter[];
-  activeTeam: ActiveTeam;
+  teamPresets: TeamPresets;
+  defaultTeamPreset: TeamPresetIndex;
   progress: DungeonProgress;
   onVictory: (result: BattleState, floor: number) => DungeonVictoryReward | null;
   onHelp: (topic: GuideTopicId) => void;
@@ -64,7 +66,7 @@ export default function WorldDungeonOverlay({ fighters, activeTeam, progress, on
           {reward.newlyCleared && reward.floor < MAX_DUNGEON_FLOOR && <p className="mt-1 text-sm font-bold">Floor {reward.floor + 1} unlocked!</p>}
         </div>}
 
-        <Battle key={floor} fighters={fighters} initialTeamIds={activeTeam} enemyTeam={enemyTeam} title={`Dungeon Floor ${floor}${boss ? " · Boss" : ""}`}
+        <Battle key={floor} fighters={fighters} initialTeamIds={getDefaultPresetTeam(teamPresets, defaultTeamPreset)} teamPresets={teamPresets} defaultTeamPreset={defaultTeamPreset} enemyTeam={enemyTeam} title={`Dungeon Floor ${floor}${boss ? " · Boss" : ""}`}
           rewardDescription={`Victory: ${xp} Fighter XP per participant and ${VICTORY_COINS} coins.`}
           victoryDetail={`+${xp} Fighter XP · +${VICTORY_COINS} coins`} onVictory={finishVictory} />
       </div>

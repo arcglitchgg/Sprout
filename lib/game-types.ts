@@ -6,6 +6,9 @@ export type HarvestMutationType = "normal" | "large" | "golden" | "prismatic";
 export type MutationType = HarvestMutationType | "ascended";
 export type AscensionPity = Record<CropType, number>;
 export type ActiveTeam = [string | null, string | null, string | null];
+export type TeamPreset = { name: string; front: string | null; rearLeft: string | null; rearRight: string | null };
+export type TeamPresets = [TeamPreset, TeamPreset, TeamPreset];
+export type TeamPresetIndex = 0 | 1 | 2;
 export type FighterNaturalStats = {
   hp: number;
   attack: number;
@@ -59,6 +62,8 @@ export type Fighter = {
   level: number;
   xp: number;
   locked: boolean;
+  name?: string;
+  favorite?: boolean;
   visualScale?: number;
 };
 

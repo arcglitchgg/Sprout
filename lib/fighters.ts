@@ -83,6 +83,7 @@ export function generateFighter(source: { crop: CropType; mutation: MutationType
     level: 1,
     xp: 0,
     locked: false,
+    favorite: false,
   };
 
   return fighter;

@@ -14,6 +14,14 @@ export function getXpRequiredForNextLevel(currentLevel: number) {
   return 50 + 30 * (currentLevel - 1);
 }
 
+export function getFighterXpProgress(fighter: Pick<Fighter, "level" | "xp">) {
+  const completed = fighter.level - 1;
+  const levelStart = completed * 50 + 15 * completed * (completed - 1);
+  const required = getXpRequiredForNextLevel(fighter.level);
+  const current = Math.max(0, fighter.xp - levelStart);
+  return { current, required, percent: Math.min(100, current / required * 100) };
+}
+
 export function getLevelFromXp(xp: number) {
   if (!Number.isSafeInteger(xp) || xp < 0) throw new Error("Fighter XP must be a nonnegative integer.");
   const completedLevels = Math.floor((-35 + Math.sqrt(1225 + 60 * xp)) / 30);
