@@ -7,7 +7,7 @@ import BattleArena from "@/components/BattleArena";
 import type { BattlePresentationProgress } from "@/components/BattleArena";
 import type { BattleState } from "@/lib/battle-types";
 import type { Fighter, TeamPresetIndex, TeamPresets } from "@/lib/game-types";
-import TeamSelector from "@/components/TeamSelector";
+import TeamSelector, { TeamCardPreview } from "@/components/TeamSelector";
 import { getDefaultBattleSelection, presetToActiveTeam, retainExistingTeamIds, validActiveTeamSelection } from "@/lib/team-selection";
 
 export default function Battle({ fighters, enemyTeam, initialTeamIds, teamPresets, defaultTeamPreset = 0, title = "Training Garden · 3v3", rewardDescription, victoryDetail, onVictory, onComplete }: {
@@ -66,7 +66,7 @@ export default function Battle({ fighters, enemyTeam, initialTeamIds, teamPreset
       <h2 className="text-xl font-bold">{title}</h2>
       <p className="mt-1 text-sm">{rewardDescription ?? `Victory: ${VICTORY_COINS} coins.`} Defeat or draw: no penalty. Fighters recover fully after battle.</p>
       {teamPresets && <label className="mt-3 block text-sm font-bold">Team source<select value={teamSource} onChange={(event) => chooseSource(event.target.value)} className="mt-1 block w-full rounded-lg bg-[#fff8dc] p-2"><option value="manual">Manual</option>{teamPresets.map((preset, index) => <option key={index} value={index}>{preset.name}{index === defaultTeamPreset ? " · Default" : ""}</option>)}</select></label>}
-      {!choosingTeam && valid && <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Active Team</strong><button type="button" onClick={() => setChoosingTeam(true)} className="text-sm font-bold underline">Choose Different Team</button></div><div className="mt-2 grid gap-2 sm:grid-cols-3">{team.map((fighter, slot) => <div key={fighter.id} className="rounded-lg bg-white/60 p-2 text-xs"><strong>{slot === 0 ? "Front" : slot === 1 ? "Rear Left" : "Rear Right"}</strong><span className="block">Lv. {fighter.level} {fighter.crop} · {fighter.mutation} · {fighter.personality}</span></div>)}</div></div>}
+      {!choosingTeam && valid && <div className="mt-4 rounded-xl bg-[#fff8dc] p-3"><div className="flex items-center justify-between gap-2"><strong>Selected preset</strong><button type="button" onClick={() => { setTeamSource("manual"); setChoosingTeam(true); }} className="text-sm font-bold underline">Choose Different Team</button></div><TeamCardPreview fighters={fighters} selected={availableSelection} /></div>}
       {choosingTeam && <TeamSelector fighters={fighters} selected={availableSelection} onSelect={setSelected} locked={running || presenting} />}
       {!initialValid && initialTeamIds?.some(Boolean) && <p className="mt-2 text-sm font-bold text-[#8b2f24]">Active Team needs updating. Choose a team for this battle.</p>}
       <button disabled={!valid || running || presenting} onClick={beginBattle} className="my-4 rounded-xl bg-[#d9ed92] px-5 py-3 font-bold disabled:opacity-40">

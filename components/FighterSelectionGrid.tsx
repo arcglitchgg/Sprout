@@ -13,12 +13,13 @@ type Props = {
   speciesFilter?: RosterSpeciesFilter;
   formationLabel?: string;
   emptyMessage?: string;
+  isFighterDisabled?: (fighter: Fighter) => boolean;
 };
 
-export default function FighterSelectionGrid({ fighters, selectedFighterId, onSelect, compact = true, disabled = false, rarityFilter = "all", speciesFilter = "all", formationLabel, emptyMessage = "No fighters match these filters." }: Props) {
+export default function FighterSelectionGrid({ fighters, selectedFighterId, onSelect, compact = true, disabled = false, rarityFilter = "all", speciesFilter = "all", formationLabel, emptyMessage = "No fighters match these filters.", isFighterDisabled }: Props) {
   const visible = filterFighterRoster(fighters, rarityFilter, speciesFilter);
   if (!visible.length) return <p className="rounded-xl bg-[#fff8dc] p-4 text-sm">{emptyMessage}</p>;
   return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label="Choose a fighter">
-    {visible.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} compact={compact} selectable selected={selectedFighterId === fighter.id} disabled={disabled} formationLabel={selectedFighterId === fighter.id ? formationLabel : undefined} onSelect={onSelect} />)}
+    {visible.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} compact={compact} selectable selected={selectedFighterId === fighter.id} disabled={disabled || Boolean(isFighterDisabled?.(fighter))} formationLabel={selectedFighterId === fighter.id ? formationLabel : undefined} onSelect={onSelect} />)}
   </div>;
 }

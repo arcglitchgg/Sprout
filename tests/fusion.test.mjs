@@ -119,7 +119,16 @@ test("Save V3 round-trips the fused roster without a schema change", () => {
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
   assert.equal(writeSproutSave(save, storage), true);
   assert.equal(JSON.parse(storage.getItem(SAVE_KEY)).game.fighters.length, 2);
-  assert.deepEqual(loadSproutSave(storage), { status: "loaded", save });
+  const expected = structuredClone(save);
+  expected.game.fighters = expected.game.fighters.map((entry) => ({ ...entry, favorite: false }));
+  expected.game.teamPresets = [
+    { name: "Team 1", front: null, rearLeft: null, rearRight: null },
+    { name: "Team 2", front: null, rearLeft: null, rearRight: null },
+    { name: "Team 3", front: null, rearLeft: null, rearRight: null },
+  ];
+  expected.game.defaultTeamPreset = 0;
+  expected.game.ascendantShards = 0;
+  assert.deepEqual(loadSproutSave(storage), { status: "loaded", save: expected });
 });
 
 test("Save V3 without pity still loads; Ascended fighter saves but harvested Ascended is rejected", () => {
