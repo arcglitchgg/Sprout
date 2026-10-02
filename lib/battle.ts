@@ -7,7 +7,7 @@ import type { BattleSide, BattleState, Combatant } from "@/lib/battle-types";
 import type { Fighter } from "@/lib/game-types";
 
 export function actionInterval(speed: number) {
-  return Math.max(600, Math.min(5000, 3000 * 20 / speed));
+  return Math.max(300, Math.min(5000, 3000 * 20 / speed));
 }
 
 export { calculateDamage } from "@/lib/skill-selection";

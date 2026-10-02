@@ -7,7 +7,6 @@ export const FIGHTER_GROWTH_CEILINGS: Record<CropType, Record<FighterCombatStat,
   carrot: { hp: 1.8, attack: 2, defense: 1.7, speed: 2.5 },
   corn: { hp: 1.8, attack: 2.5, defense: 1.7, speed: 1.75 },
 };
-export const MAX_EFFECTIVE_BATTLE_SPEED = 100;
 
 export function getXpRequiredForNextLevel(currentLevel: number) {
   if (!Number.isSafeInteger(currentLevel) || currentLevel < 1) throw new Error("Fighter level must be a positive integer.");
@@ -35,12 +34,9 @@ export function awardFighterXp(fighter: Fighter, amount: number): Fighter {
   return { ...fighter, xp, level: getLevelFromXp(xp) };
 }
 
-export function getFighterStatMultiplier(crop: CropType, stat: FighterCombatStat, level: number, storedStat: number) {
+export function getFighterStatMultiplier(crop: CropType, stat: FighterCombatStat, level: number) {
   if (!Number.isSafeInteger(level) || level < 1) throw new Error("Fighter level must be a positive integer.");
-  const configuredCeiling = FIGHTER_GROWTH_CEILINGS[crop][stat];
-  const ceiling = stat === "speed" && storedStat > 0
-    ? Math.max(1, Math.min(configuredCeiling, MAX_EFFECTIVE_BATTLE_SPEED / storedStat))
-    : configuredCeiling;
+  const ceiling = FIGHTER_GROWTH_CEILINGS[crop][stat];
   if (ceiling === 1 || level === 1) return 1;
   return ceiling - (ceiling - 1) * Math.exp(-FIGHTER_STAT_BONUS_PER_LEVEL * (level - 1) / (ceiling - 1));
 }
@@ -49,7 +45,7 @@ export function getEffectiveFighter(fighter: Fighter): Fighter {
   // Runtime defaults keep already-created PvP/defense snapshots from before Save V3 replayable.
   const level = Number.isSafeInteger(fighter.level) && fighter.level >= 1 ? fighter.level : 1;
   const xp = Number.isSafeInteger(fighter.xp) && fighter.xp >= 0 ? fighter.xp : 0;
-  const scale = (stat: FighterCombatStat) => Math.round(fighter[stat] * getFighterStatMultiplier(fighter.crop, stat, level, fighter[stat]));
+  const scale = (stat: FighterCombatStat) => Math.round(fighter[stat] * getFighterStatMultiplier(fighter.crop, stat, level));
   return {
     ...fighter,
     level,

@@ -51,12 +51,16 @@ test("species skills scale from their signature effective stats", () => {
   assert.equal(calculateActionDamage({ ...attacker, hp: 260, speed: 80 }, target, ACTIONS["kernel-burst"]), Math.round(20 * 1.60));
 });
 
-test("Speed action interval uses a 600ms safety floor", () => {
+test("Speed action interval allows sub-600ms actions with a 300ms safety floor", () => {
   assert.equal(actionInterval(50), 1200);
   assert.equal(actionInterval(60), 1000);
   assert.equal(actionInterval(80), 750);
   assert.equal(actionInterval(100), 600);
-  assert.equal(actionInterval(120), 600);
+  assert.equal(actionInterval(120), 500);
+  assert.equal(actionInterval(150), 400);
+  assert.ok(Math.abs(actionInterval(168) - 60000 / 168) < 0.000001);
+  assert.equal(actionInterval(200), 300);
+  assert.equal(actionInterval(300), 300);
 });
 
 test("base weights and personality modifiers bias both actions without eliminating either", () => {

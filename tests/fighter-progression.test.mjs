@@ -59,8 +59,21 @@ test("species ceilings retain tank, Speed, and ATK identities", () => {
   assert.ok(potato.hp > carrot.hp && potato.hp > corn.hp);
   assert.ok(potato.defense > carrot.defense && potato.defense > corn.defense);
   assert.ok(carrot.speed > potato.speed && carrot.speed > corn.speed);
-  assert.ok(carrot.speed <= 100);
+  assert.equal(FIGHTER_GROWTH_CEILINGS.potato.speed, 1.5);
+  assert.equal(FIGHTER_GROWTH_CEILINGS.carrot.speed, 2.5);
+  assert.equal(FIGHTER_GROWTH_CEILINGS.corn.speed, 1.75);
+  assert.ok(getFighterStatMultiplier("carrot", "speed", level) <= 2.5);
+  assert.ok(getFighterStatMultiplier("carrot", "speed", level) > 2.49);
   assert.ok(corn.attack > potato.attack && corn.attack > carrot.attack);
+});
+
+test("Carrot Speed uses its configured ceiling without mutating stored Lv1 Speed", () => {
+  const carrot = { ...fighter, crop: "carrot", speed: 67, level: 10_000 };
+  const before = carrot.speed;
+  const effective = getEffectiveFighter(carrot);
+  assert.equal(carrot.speed, before);
+  assert.ok(effective.speed > 100);
+  assert.ok(effective.speed >= 167 && effective.speed <= 168);
 });
 
 test("high natural rolls remain stronger at high levels", () => {
