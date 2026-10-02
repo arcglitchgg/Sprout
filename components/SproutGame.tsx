@@ -39,6 +39,8 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
     setFarmerWorld({ farmerTile, facing });
   }, []);
+  const saveLabel = syncState === "saved" ? "Saved" : syncState === "saving" ? "Saving..." : syncState === "local-only" ? "Local only" : syncState === "conflict" ? "Conflict" : syncState === "local-failed" ? "Local save failed" : "Cloud save failed";
+  const saveWarning = syncState === "conflict" ? "Cloud save conflict — newer local progress is preserved on this device." : syncState === "local-failed" ? "Local save failed — progress durability is not guaranteed." : syncState === "cloud-failed" ? "Cloud save failed — progress is currently stored locally." : null;
 
   useEffect(() => {
     scheduleSave({
@@ -71,8 +73,11 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
             <div className="rounded-lg bg-[#d9ed92] px-2 py-1.5 text-[11px] font-black tabular-nums text-[#304719] sm:px-3 sm:text-sm">
               Farm Lv {farmLevel} · {farmXp} XP
             </div>
+            <div role="status" className={`rounded-lg px-2 py-1.5 text-[11px] font-black ${syncState === "saved" ? "bg-[#d9ed92] text-[#304719]" : syncState === "saving" ? "bg-[#ffe28a] text-[#4a2c12]" : "bg-[#ffd0b8] text-[#6f241d]"}`}>{saveLabel}</div>
           </div>
         </header>
+
+        {saveWarning && <div className="mb-2 shrink-0 rounded-lg bg-[#ffd0b8] px-3 py-2 text-center text-xs font-bold text-[#6f241d]" role="alert">{saveWarning}</div>}
 
         <div className="min-h-0 flex-1">
           <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} activeTeam={activeTeam} teamPresets={teamPresets} defaultTeamPreset={defaultTeamPreset} ascendantShards={ascendantShards} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} setFighterFavorite={setFighterFavorite} renameFighter={renameFighter} releaseFighter={releaseFighter} dismantleFighter={dismantleFighter} setTeamPreset={setTeamPreset} renameTeamPreset={renameTeamPreset} setDefaultTeamPreset={setDefaultTeamPreset} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} onOpenGuide={(topic) => setMenuGuide(topic)} />

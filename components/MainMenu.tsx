@@ -17,7 +17,7 @@ export default function MainMenu({ fighters, activeTeam, farmLevel, syncState, i
   useEffect(() => { if (initialGuide) { setSection("guides"); setGuide(initialGuide); } }, [initialGuide]);
   const team = getActiveTeamFighters(activeTeam, fighters);
   const cp = getActiveTeamCombatPower(activeTeam, fighters);
-  const sessionStatus = discord.sessionDisconnected ? "Session Disconnected" : discord.environment === "discord" && (!discord.session || syncState === "loading-cloud" || syncState === "unsynced" || syncState === "conflict") ? "Reconnecting" : "Connected";
+  const sessionStatus = discord.sessionDisconnected ? "Session Disconnected" : discord.environment === "discord" && (!discord.session || syncState === "cloud-failed" || syncState === "conflict") ? "Reconnecting" : "Connected";
   const avatar = discord.user?.avatar ? (discord.user.avatar.startsWith("http") ? discord.user.avatar : `https://cdn.discordapp.com/avatars/${discord.user.id}/${discord.user.avatar}.png?size=64`) : null;
 
   return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="main-menu-title">

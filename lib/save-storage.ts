@@ -8,6 +8,7 @@ import type { SproutSaveV1, SproutSaveV2, SproutSaveV3 } from "@/lib/save-types"
 
 export const SAVE_KEY = "sprout.save";
 export const discordSaveKey = (userId: string) => `sprout.save.${userId}`;
+export const cloudAckKey = (saveKey: string) => `${saveKey}.cloud-ack`;
 export const CURRENT_SAVE_VERSION = 3;
 
 export type SaveLoadResult =
@@ -15,6 +16,16 @@ export type SaveLoadResult =
   | { status: "loaded"; save: SproutSaveV3 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+export function readSaveAcknowledgement(storage: StorageLike, saveKey: string) {
+  try {
+    const value: unknown = JSON.parse(storage.getItem(cloudAckKey(saveKey)) ?? "null");
+    return isRecord(value) && Number.isSafeInteger(value.revision) && (value.revision as number) > 0 && isFiniteNonnegative(value.savedAt)
+      ? { revision: value.revision as number, savedAt: value.savedAt as number } : null;
+  } catch { return null; }
+}
+export function writeSaveAcknowledgement(storage: StorageLike, saveKey: string, revision: number, savedAt: number) {
+  try { storage.setItem(cloudAckKey(saveKey), JSON.stringify({ revision, savedAt })); return true; } catch { return false; }
+}
 const crops: CropType[] = ["potato", "carrot", "corn"];
 const harvestMutations: HarvestMutationType[] = ["normal", "large", "golden", "prismatic"];
 const fighterMutations: MutationType[] = [...harvestMutations, "ascended"];

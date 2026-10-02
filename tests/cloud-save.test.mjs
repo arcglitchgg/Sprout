@@ -24,7 +24,7 @@ test("signed session verifies only the intended user until expiry", () => {
   assert.equal(sessions.verifySproutSession(issued, 1_000_000, "different-long-test-secret-more-than-32-chars"), null);
 });
 
-const validSave = { version: 2, game: { coins: 9, farmXp: 40 } };
+const validSave = { version: 3, savedAt: 100, game: { coins: 9, farmXp: 40 } };
 function routeHarness({ stored = null, write = { revision: 1, updatedAt: "now" } } = {}) {
   const calls = [];
   const route = load("app/api/game/save/route.ts", {
@@ -34,7 +34,7 @@ function routeHarness({ stored = null, write = { revision: 1, updatedAt: "now" }
       readCloudSave: async (id) => { calls.push(["read", id]); return stored; },
       writeCloudSave: async (...args) => { calls.push(["write", ...args]); return write; },
     },
-    "@/lib/save-storage": { validateSproutSave: (save) => save?.version === 2 && save?.game?.coins === 9 },
+    "@/lib/save-storage": { validateSproutSave: (save) => save?.version === 3 && save?.game?.coins === 9, migrateSproutSave: (save) => save?.version === 3 ? save : null },
   });
   return { route, calls };
 }
@@ -68,13 +68,17 @@ test("separate Discord users get separate local cache keys", () => {
   const { discordSaveKey } = load("lib/save-storage.ts", {
     "@/lib/world-data": { FIRST_WORLD: { width: 1, height: 1, blocked: [false] } },
     "@/lib/progression": { TOTAL_FARM_PLOTS: 144 },
+    "@/lib/fighter-progression": { getLevelFromXp: () => 1 },
+    "@/lib/fighters": { FIGHTER_NATURAL_STAT_RANGES: {} },
+    "@/lib/team-selection": {},
   });
   assert.notEqual(discordSaveKey("12345"), discordSaveKey("67890"));
 });
 
 test("client protocol loads cloud save and uploads a first revision", async () => {
   const { fetchCloudSave, putCloudSave } = load("lib/cloud-save-client.ts", {
-    "@/lib/save-storage": { validateSproutSave: (save) => save?.version === 2 },
+    "@/lib/save-storage": { migrateSproutSave: (save) => save?.version === 3 ? save : null },
+    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session) },
   });
   const previous = globalThis.fetch;
   const calls = [];
@@ -94,7 +98,8 @@ test("client protocol loads cloud save and uploads a first revision", async () =
 
 test("failed cloud request leaves local save storage untouched", async () => {
   const { putCloudSave } = load("lib/cloud-save-client.ts", {
-    "@/lib/save-storage": { validateSproutSave: () => true },
+    "@/lib/save-storage": { migrateSproutSave: (save) => save },
+    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session) },
   });
   const previous = globalThis.fetch;
   const local = JSON.stringify(validSave);
