@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { BattleState } from "@/lib/battle-types";
+import type { BattleState, BattleVisualActionEvent } from "@/lib/battle-types";
+import { applyBattleVisualEvent, createBattlePlayback } from "@/lib/battle-playback";
 import type { Fighter } from "@/lib/game-types";
 import { TRAINING_TEAM } from "@/lib/battle-data";
-import { crops } from "@/lib/game-data";
 import { ACTIONS } from "@/lib/skill-data";
 import BattleFighter from "@/components/BattleFighter";
 import BattleSprite from "@/components/BattleSprite";
@@ -30,75 +30,55 @@ const position = (fighter: PlacedFighter) => ({
 export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_TEAM, onProgress, sideLabels = ["Your garden", "Training rivals"] }: { battle: BattleState | null; team: (Fighter | undefined)[]; previewEnemyTeam?: Fighter[]; onProgress: (progress: BattlePresentationProgress) => void; sideLabels?: [string, string] }) {
   const latest = useRef(battle);
   const cursor = useRef(0);
-  const visibleLogCount = useRef(battle ? 1 : 0);
+  const visibleLogCount = useRef(0);
   const completionReported = useRef(false);
   const presenting = useRef(false);
   const [active, setActive] = useState<number | null>(null);
   const [phase, setPhase] = useState<"idle" | "action" | "reaction" | "intercept-return" | "recovery">("idle");
   const [reaction, setReaction] = useState<"hurt" | "ko" | null>(null);
   const [dialogue, setDialogue] = useState<{ id: string; text: string; expires: number } | null>(null);
-  const initialHp = Object.fromEntries((battle?.combatants ?? []).map((fighter) => [fighter.id, fighter.hp]));
+  const initialHp = battle ? createBattlePlayback(battle).displayedHp : {};
   const displayHpRef = useRef<Record<string, number>>(initialHp);
   const [displayHp, setDisplayHp] = useState<Record<string, number>>(initialHp);
   useEffect(() => { latest.current = battle; }, [battle]);
-  // This scheduler only consumes recorded decisions. It never advances or writes combat state.
+  // This scheduler only consumes immutable visual events. It never advances combat state.
   useEffect(() => {
     let cancelled = false;
     const delay = (duration: number) => new Promise<void>((resolve) => setTimeout(resolve, duration));
 
     async function present(index: number, current: BattleState) {
       presenting.current = true;
-      const decision = current.decisions[index];
-      const actor = current.combatants.find((fighter) => fighter.id === decision.actorId);
-      const intended = current.combatants.find((fighter) => fighter.id === decision.intendedTargetId);
-      const recipient = current.combatants.find((fighter) => fighter.id === decision.actualTargetId);
-      const intercepted = Boolean(recipient && intended && recipient.id !== intended.id);
-      let dialogueText: string | undefined;
-      setActive(index);
-
-      if (actor) {
-        const prefix = `${actor.side === "player" ? "Your" : "Enemy"} ${crops[actor.crop].name} (${actor.slot + 1}): `;
-        const line = current.log.find((event) => event.at === decision.at && event.message.startsWith(prefix));
-        dialogueText = line?.message.slice(prefix.length);
+      const event = current.visualEvents[index];
+      if (event.type === "result") {
+        const playback = applyBattleVisualEvent({ displayedHp: displayHpRef.current, visibleLogCount: visibleLogCount.current, visibleStatus: null, complete: false }, event);
+        visibleLogCount.current = playback.visibleLogCount;
+        completionReported.current = true;
+        onProgress({ elapsed: event.simulatedTime, logCount: playback.visibleLogCount, complete: true });
+        presenting.current = false;
+        return;
       }
-
-      const actionDuration = decision.chosenAction === "basic" ? NORMAL_ACTION_DURATION_MS : SKILL_ACTION_DURATION_MS;
-      const impactAt = decision.chosenAction === "basic" ? 800 : 1150;
+      const actor = current.combatants.find((fighter) => fighter.id === event.actorId);
+      const intended = current.combatants.find((fighter) => fighter.id === event.intendedTargetId);
+      const recipient = current.combatants.find((fighter) => fighter.id === event.actualTargetId);
+      const intercepted = Boolean(event.interceptedById);
+      setActive(index);
+      const actionDuration = event.actionId === "basic" ? NORMAL_ACTION_DURATION_MS : SKILL_ACTION_DURATION_MS;
+      const impactAt = event.actionId === "basic" ? 800 : 1150;
       setPhase("action");
       await delay(impactAt);
       if (cancelled) return;
 
-      let nextHp: number | undefined;
-      if (actor && recipient) {
-        const prefix = `${actor.side === "player" ? "Your" : "Enemy"} ${crops[actor.crop].name} (${actor.slot + 1})`;
-        const actionName = ACTIONS[decision.chosenAction].name;
-        const actionLogIndex = current.log.findIndex((event, logIndex) =>
-          logIndex >= visibleLogCount.current && event.at === decision.at && event.message.startsWith(`${prefix} uses ${actionName} `)
-        );
-        const actionLine = actionLogIndex >= 0 ? current.log[actionLogIndex].message : "";
-        const damage = Number(actionLine.match(/ for (\d+)\.$/)?.[1] ?? 0);
-        if (damage > 0) {
-          nextHp = Math.max(0, (displayHpRef.current[decision.actualTargetId] ?? recipient.hp) - damage);
-          displayHpRef.current = { ...displayHpRef.current, [decision.actualTargetId]: nextHp };
-          setDisplayHp(displayHpRef.current);
-          setReaction(nextHp === 0 ? "ko" : "hurt");
-        }
-        if (actionLogIndex >= 0) {
-          let logCount = actionLogIndex + 1;
-          while (logCount < current.log.length && current.log[logCount].at === decision.at) {
-            const message = current.log[logCount].message;
-            if (message.includes(" uses ") || message.includes(" intercepts ") || message.startsWith("Battle ended:") || message.startsWith("Time limit reached:")) break;
-            logCount += 1;
-          }
-          visibleLogCount.current = logCount;
-        }
-      }
+      const playback = applyBattleVisualEvent({ displayedHp: displayHpRef.current, visibleLogCount: visibleLogCount.current, visibleStatus: null, complete: false }, event);
+      displayHpRef.current = playback.displayedHp;
+      visibleLogCount.current = playback.visibleLogCount;
+      setDisplayHp(playback.displayedHp);
+      setReaction(event.ko ? "ko" : "hurt");
       setPhase("reaction");
-      if (actor && dialogueText) setDialogue({ id: actor.id, text: dialogueText, expires: performance.now() + DIALOGUE_DURATION_MS });
-      onProgress({ elapsed: decision.at, logCount: visibleLogCount.current, complete: false });
+      if (actor && event.dialogue) setDialogue({ id: actor.id, text: event.dialogue, expires: performance.now() + DIALOGUE_DURATION_MS });
+      onProgress({ elapsed: event.simulatedTime, logCount: visibleLogCount.current, complete: false });
 
       const actionRemaining = actionDuration - impactAt;
-      const reactionDuration = nextHp === 0 ? KO_REACTION_DURATION_MS : nextHp === undefined ? 0 : HURT_REACTION_DURATION_MS;
+      const reactionDuration = event.ko ? KO_REACTION_DURATION_MS : HURT_REACTION_DURATION_MS;
       await delay(Math.max(actionRemaining, reactionDuration));
       if (cancelled) return;
       setReaction(null);
@@ -120,7 +100,7 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
       if (!current) return;
       setDialogue((value) => value && value.expires <= performance.now() ? null : value);
       if (presenting.current) return;
-      if (cursor.current >= current.decisions.length) {
+      if (cursor.current >= current.visualEvents.length) {
         setActive(null);
         if (current.status !== "running" && !completionReported.current) {
           completionReported.current = true;
@@ -139,13 +119,14 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
     ...team.flatMap((fighter, slot) => fighter ? [{ ...fighter, side: "player" as const, slot, currentHp: fighter.hp }] : []),
     ...previewEnemyTeam.map((fighter, slot) => ({ ...fighter, side: "enemy" as const, slot, currentHp: fighter.hp })),
   ];
-  const event = active === null ? undefined : battle?.decisions[active];
+  const queuedEvent = active === null ? undefined : battle?.visualEvents[active];
+  const event: BattleVisualActionEvent | undefined = queuedEvent?.type === "action" ? queuedEvent : undefined;
   const actor = fighters.find((fighter) => fighter.id === event?.actorId);
   const recipient = fighters.find((fighter) => fighter.id === event?.actualTargetId);
   const intended = fighters.find((fighter) => fighter.id === event?.intendedTargetId);
   const intercept = recipient && intended && recipient.id !== intended.id;
   const destination = intercept ? intended : recipient;
-  const actionAnimation = event?.chosenAction === "basic" ? "normal-attack" as const : "skill" as const;
+  const actionAnimation = event?.actionId === "basic" ? "normal-attack" as const : "skill" as const;
   const showingAction = phase === "action" || phase === "reaction";
   const showingIntercept = Boolean(intercept && (showingAction || phase === "intercept-return"));
   const travel = (from: PlacedFighter, to: PlacedFighter): CSSProperties => ({
@@ -161,20 +142,20 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
       <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot} scale={fighter.visualScale}
         animationKey={active}
         dialogue={dialogue?.id === fighter.id ? dialogue.text : undefined}
-        impact={phase === "reaction" && reaction === "hurt" && !intercept && event?.actualTargetId === fighter.id ? event.chosenAction === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : undefined}
+        impact={phase === "reaction" && reaction === "hurt" && !intercept && event?.actualTargetId === fighter.id ? event.actionId === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : undefined}
         shield={false}
-        animation={showingAction && event?.actorId === fighter.id && event.chosenAction === "kernel-burst" ? actionAnimation : undefined}
-        moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.chosenAction !== "kernel-burst" || showingIntercept && recipient?.id === fighter.id))} />
+        animation={showingAction && event?.actorId === fighter.id && event.actionId === "kernel-burst" ? actionAnimation : undefined}
+        moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.actionId !== "kernel-burst" || showingIntercept && recipient?.id === fighter.id))} />
     </div>)}
-    {showingAction && event && actor && destination && <div key={`action-${active}`} className={`battle-traveler battle-${event.chosenAction}`} style={travel(actor, destination)} aria-hidden="true">
-      {event.chosenAction === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} /></span>}
+    {showingAction && event && actor && destination && <div key={`action-${active}`} className={`battle-traveler battle-${event.actionId}`} style={travel(actor, destination)} aria-hidden="true">
+      {event.actionId === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} /></span>}
     </div>}
     {showingIntercept && event && intercept && <div key={`guard-${active}`} className={`battle-traveler ${phase === "intercept-return" ? "battle-intercept-return" : "battle-intercept-engage"}`} style={travel(recipient, intended)} aria-hidden="true">
-      <div className={`${phase === "reaction" && reaction === "hurt" ? event.chosenAction === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : ""} ${recipient.currentHp === 0 ? "battle-ko" : ""}`}>
+      <div className={`${phase === "reaction" && reaction === "hurt" ? event.actionId === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : ""} ${recipient.currentHp === 0 ? "battle-ko" : ""}`}>
         <BattleSprite fighter={recipient} animation="guard" playbackKey={active} />
       </div>
       <span className="absolute -top-3 right-0">🛡️</span>
     </div>}
-    <div className="absolute inset-x-0 bottom-3 text-center text-xs font-bold">{event ? ACTIONS[event.chosenAction].name : "Frontline in the center · rear fighters on the flanks"}</div>
+    <div className="absolute inset-x-0 bottom-3 text-center text-xs font-bold">{event ? ACTIONS[event.actionId].name : "Frontline in the center · rear fighters on the flanks"}</div>
   </div>;
 }

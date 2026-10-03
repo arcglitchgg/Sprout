@@ -17,6 +17,34 @@ export type Combatant = Fighter & {
 
 export type BattleEvent = { at: number; message: string };
 
+export type BattleVisualActionEvent = {
+  type: "action";
+  sequence: number;
+  simulatedTime: number;
+  actorId: string;
+  intendedTargetId: string;
+  actualTargetId: string;
+  actionId: ActionId;
+  damage: number;
+  resultingHp: number;
+  ko: boolean;
+  interceptedById?: string;
+  dialogue?: string;
+  logStartIndex: number;
+  logEndIndex: number;
+};
+
+export type BattleVisualResultEvent = {
+  type: "result";
+  sequence: number;
+  simulatedTime: number;
+  status: Exclude<BattleStatus, "running">;
+  logStartIndex: number;
+  logEndIndex: number;
+};
+
+export type BattleVisualEvent = BattleVisualActionEvent | BattleVisualResultEvent;
+
 export type BattleState = {
   id: string;
   mode: BattleMode;
@@ -27,4 +55,5 @@ export type BattleState = {
   seed: number;
   rngState: number;
   decisions: ActionDecision[];
+  visualEvents: BattleVisualEvent[];
 };

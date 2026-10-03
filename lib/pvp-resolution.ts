@@ -1,4 +1,4 @@
-import { advanceBattle, createFriendlyBattle } from "@/lib/battle";
+import { createFriendlyBattle, resolveBattle } from "@/lib/battle";
 import type { LivePvpMatch } from "@/lib/pvp-types";
 
 export type PvpResult = "challenger" | "opponent" | "draw";
@@ -8,7 +8,7 @@ export function resolvePvpMatch(match: LivePvpMatch): { winnerId: string | null;
   if (!match.challengerTeam || !match.opponentTeam || !match.battleId || !Number.isSafeInteger(match.battleSeed)) {
     throw new Error("Match snapshot is incomplete.");
   }
-  const battle = advanceBattle(createFriendlyBattle(match.challengerTeam, match.opponentTeam, match.battleId, match.battleSeed!), 60000);
+  const battle = resolveBattle(createFriendlyBattle(match.challengerTeam, match.opponentTeam, match.battleId, match.battleSeed!));
   if (battle.status === "running") throw new Error("Battle did not finish.");
   if (battle.status === "draw") return { winnerId: null, result: "draw" };
   return battle.status === "victory"

@@ -41,7 +41,7 @@ export default function Battle({ fighters, enemyTeam, initialTeamIds, teamPreset
   const displayedStatus = battle && presentation.complete ? battle.status : battle ? "running" : null;
 
   function beginBattle() {
-    setPresentation({ elapsed: 0, logCount: 1, complete: false });
+    setPresentation({ elapsed: 0, logCount: 0, complete: false });
     startBattle(team, enemyTeam);
   }
   function chooseSource(value: string) {
