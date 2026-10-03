@@ -90,6 +90,17 @@ test("valid durable progress round-trips without transient state", () => {
   assert.equal("battle" in JSON.parse(storage.getItem(SAVE_KEY)), false);
 });
 
+test("selected character persists while legacy Save V3 defaults remain valid", () => {
+  const storage = memoryStorage();
+  const selected = validSave();
+  selected.world.selectedCharacterId = "character-667449";
+  assert.equal(writeSproutSave(selected, storage), true);
+  assert.equal(loadSproutSave(storage).save.world.selectedCharacterId, "character-667449");
+  const legacy = validSave();
+  assert.equal(validateSproutSave(legacy), true);
+  assert.equal(loadSproutSave(memoryStorage({ [SAVE_KEY]: JSON.stringify(legacy) })).save.world.selectedCharacterId, undefined);
+});
+
 test("large cumulative Farm XP round-trips without a save migration or clamp", () => {
   const save = validSave();
   save.game.farmXp = 194_000;

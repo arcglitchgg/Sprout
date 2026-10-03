@@ -1,0 +1,492 @@
+{
+  "frames": [
+    {
+      "filename": "idle_0",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 286
+    },
+    {
+      "filename": "idle_1",
+      "frame": {
+        "x": 32,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 234
+    },
+    {
+      "filename": "idle_2",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 286
+    },
+    {
+      "filename": "idle_3",
+      "frame": {
+        "x": 96,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 234
+    },
+    {
+      "filename": "normal_attack_0",
+      "frame": {
+        "x": 0,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 221
+    },
+    {
+      "filename": "normal_attack_1",
+      "frame": {
+        "x": 32,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 156
+    },
+    {
+      "filename": "normal_attack_2",
+      "frame": {
+        "x": 64,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 117
+    },
+    {
+      "filename": "normal_attack_3",
+      "frame": {
+        "x": 96,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 286
+    },
+    {
+      "filename": "defense_0",
+      "frame": {
+        "x": 0,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 156
+    },
+    {
+      "filename": "defense_1",
+      "frame": {
+        "x": 32,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 338
+    },
+    {
+      "filename": "defense_2",
+      "frame": {
+        "x": 64,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 260
+    },
+    {
+      "filename": "defense_pad3",
+      "frame": {
+        "x": 96,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 167
+    },
+    {
+      "filename": "skill_0",
+      "frame": {
+        "x": 0,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 247
+    },
+    {
+      "filename": "skill_1",
+      "frame": {
+        "x": 32,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 156
+    },
+    {
+      "filename": "skill_2",
+      "frame": {
+        "x": 64,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 143
+    },
+    {
+      "filename": "skill_3",
+      "frame": {
+        "x": 96,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      },
+      "duration": 364
+    }
+  ],
+  "meta": {
+    "app": "Topdown Sprite Forge",
+    "version": "1.1",
+    "image": "lazy.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 128,
+      "h": 128
+    },
+    "scale": "1",
+    "tileSize": 32,
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "baseFrameSize": 32,
+    "columns": 4,
+    "rows": 4,
+    "type": "plant_fighter",
+    "kind": "plant_fighter",
+    "seed": 198174,
+    "rowNames": [
+      "idle",
+      "normal_attack",
+      "defense",
+      "skill"
+    ],
+    "frameTags": [
+      {
+        "name": "idle",
+        "from": 0,
+        "to": 3,
+        "direction": "forward"
+      },
+      {
+        "name": "normal_attack",
+        "from": 4,
+        "to": 7,
+        "direction": "forward"
+      },
+      {
+        "name": "defense",
+        "from": 8,
+        "to": 10,
+        "direction": "forward"
+      },
+      {
+        "name": "skill",
+        "from": 12,
+        "to": 15,
+        "direction": "forward"
+      }
+    ],
+    "animations": [
+      {
+        "name": "idle",
+        "label": "Idle",
+        "row": 0,
+        "from": 0,
+        "to": 3,
+        "frames": 4,
+        "padding": 0,
+        "loop": true,
+        "durations": [
+          286,
+          234,
+          286,
+          234
+        ]
+      },
+      {
+        "name": "normal_attack",
+        "label": "Attack",
+        "row": 1,
+        "from": 4,
+        "to": 7,
+        "frames": 4,
+        "padding": 0,
+        "loop": false,
+        "durations": [
+          221,
+          156,
+          117,
+          286
+        ]
+      },
+      {
+        "name": "defense",
+        "label": "Defense",
+        "row": 2,
+        "from": 8,
+        "to": 10,
+        "frames": 3,
+        "padding": 1,
+        "loop": false,
+        "durations": [
+          156,
+          338,
+          260
+        ]
+      },
+      {
+        "name": "skill",
+        "label": "Skill",
+        "row": 3,
+        "from": 12,
+        "to": 15,
+        "frames": 4,
+        "padding": 0,
+        "loop": false,
+        "durations": [
+          247,
+          156,
+          143,
+          364
+        ]
+      }
+    ],
+    "generator": {
+      "kind": "plant_fighter",
+      "seed": 198174,
+      "salt": 0,
+      "opts": {
+        "species": "corn",
+        "personality": "lazy",
+        "rarity": "large",
+        "size": "32",
+        "accessory": "auto",
+        "outline": "selective"
+      }
+    },
+    "species": "corn",
+    "personality": "lazy",
+    "rarity": "large",
+    "facing": "right",
+    "accessory": "sleep_cap",
+    "accessoryMode": "auto"
+  }
+}

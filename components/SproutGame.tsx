@@ -15,6 +15,7 @@ import { FIRST_WORLD } from "@/lib/world-data";
 import type { SproutSavePayloadV3, SproutSaveV3 } from "@/lib/save-types";
 import type { WorldPoint } from "@/lib/world-types";
 import type { GuideTopicId } from "@/lib/guide-data";
+import { normalizePlayerAvatarId } from "@/lib/player-avatar-data";
 
 export default function SproutGame() {
   const { hydration, scheduleSave, syncState } = useSproutPersistence();
@@ -34,6 +35,7 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
   }, []);
   const { coins, farmXp, farmLevel, unlockedPlotCount, selectedCrop, setSelectedCrop, seeds, buySeed, now, plots, collection, harvestedCrops, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, handlePlotClick, harvestAll, sellCrops, awakenCrop, fuseFighters, setFighterLocked, setFighterFavorite, renameFighter, releaseFighter, dismantleFighter, setTeamPreset, renameTeamPreset, setDefaultTeamPreset, awardDungeonVictory } = useGame(initialSave?.game, notify);
   const [farmerWorld, setFarmerWorld] = useState(() => initialSave?.world ?? { farmerTile: { ...FIRST_WORLD.start }, facing: "right" as const });
+  const [selectedCharacterId, setSelectedCharacterId] = useState(() => normalizePlayerAvatarId(initialSave?.world.selectedCharacterId));
   const [showLegacyPanels, setShowLegacyPanels] = useState(false);
   const [menuGuide, setMenuGuide] = useState<GuideTopicId | null | undefined>(undefined);
   const handleFarmerSettled = useCallback((farmerTile: WorldPoint, facing: "left" | "right") => {
@@ -45,9 +47,9 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
   useEffect(() => {
     scheduleSave({
       game: { coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon },
-      world: farmerWorld,
+      world: { ...farmerWorld, selectedCharacterId },
     });
-  }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, farmerWorld, scheduleSave]);
+  }, [coins, farmXp, seeds, selectedCrop, plots, harvestedCrops, collection, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, farmerWorld, selectedCharacterId, scheduleSave]);
 
   return (
     <main className="sprout-safe-screen h-dvh overflow-hidden bg-[#171c19] text-[#2f3e2f]">
@@ -80,10 +82,10 @@ function SproutGameSession({ initialSave, scheduleSave, syncState }: { initialSa
         {saveWarning && <div className="mb-2 shrink-0 rounded-lg bg-[#ffd0b8] px-3 py-2 text-center text-xs font-bold text-[#6f241d]" role="alert">{saveWarning}</div>}
 
         <div className="min-h-0 flex-1">
-          <PixelWorld coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} activeTeam={activeTeam} teamPresets={teamPresets} defaultTeamPreset={defaultTeamPreset} ascendantShards={ascendantShards} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} setFighterFavorite={setFighterFavorite} renameFighter={renameFighter} releaseFighter={releaseFighter} dismantleFighter={dismantleFighter} setTeamPreset={setTeamPreset} renameTeamPreset={renameTeamPreset} setDefaultTeamPreset={setDefaultTeamPreset} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} onOpenGuide={(topic) => setMenuGuide(topic)} />
+          <PixelWorld selectedCharacterId={selectedCharacterId} coins={coins} unlockedPlotCount={unlockedPlotCount} plots={plots} now={now} selectedCrop={selectedCrop} setSelectedCrop={setSelectedCrop} seeds={seeds} buySeed={buySeed} handlePlotClick={handlePlotClick} harvestAll={harvestAll} fighters={fighters} activeTeam={activeTeam} teamPresets={teamPresets} defaultTeamPreset={defaultTeamPreset} ascendantShards={ascendantShards} ascensionPity={ascensionPity} dungeon={dungeon} collection={collection} harvestedCrops={harvestedCrops} sellCrops={sellCrops} awakenCrop={awakenCrop} fuseFighters={fuseFighters} setFighterLocked={setFighterLocked} setFighterFavorite={setFighterFavorite} renameFighter={renameFighter} releaseFighter={releaseFighter} dismantleFighter={dismantleFighter} setTeamPreset={setTeamPreset} renameTeamPreset={renameTeamPreset} setDefaultTeamPreset={setDefaultTeamPreset} awardDungeonVictory={awardDungeonVictory} notifications={notifications} notify={notify} onDismissNotification={dismissNotification} initialFarmerTile={farmerWorld.farmerTile} initialFarmerFacing={farmerWorld.facing} onFarmerSettled={handleFarmerSettled} onOpenGuide={(topic) => setMenuGuide(topic)} />
         </div>
 
-        {menuGuide !== undefined && <MainMenu fighters={fighters} activeTeam={activeTeam} farmLevel={farmLevel} syncState={syncState} initialGuide={menuGuide} onClose={() => setMenuGuide(undefined)} />}
+        {menuGuide !== undefined && <MainMenu fighters={fighters} activeTeam={activeTeam} farmLevel={farmLevel} syncState={syncState} selectedCharacterId={selectedCharacterId} onSelectCharacter={(id) => setSelectedCharacterId(normalizePlayerAvatarId(id))} initialGuide={menuGuide} onClose={() => setMenuGuide(undefined)} />}
 
         {process.env.NODE_ENV === "development" && showLegacyPanels && (
         <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#171c19]/95 p-3 sm:p-6">

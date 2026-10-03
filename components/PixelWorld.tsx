@@ -38,6 +38,7 @@ const WORLD_PIXEL_WIDTH = FIRST_WORLD.pixelWidth;
 const WORLD_PIXEL_HEIGHT = FIRST_WORLD.pixelHeight;
 
 type Props = {
+  selectedCharacterId: string;
   coins: number;
   unlockedPlotCount: number;
   plots: Plot[];
@@ -87,7 +88,7 @@ export default function PixelWorld(props: Props) {
     onReturnHome={() => setContext({ mode: "own-farm" })} />;
 }
 
-function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, setFighterLocked, setFighterFavorite, renameFighter, releaseFighter, dismantleFighter, setTeamPreset, renameTeamPreset, setDefaultTeamPreset, awardDungeonVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, onOpenGuide, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
+function PixelWorldScene({ selectedCharacterId, coins, unlockedPlotCount: ownUnlockedPlotCount, plots: ownPlots, now, selectedCrop, setSelectedCrop, seeds, buySeed, handlePlotClick, harvestAll, fighters, activeTeam, teamPresets, defaultTeamPreset, ascendantShards, ascensionPity, dungeon, collection, harvestedCrops, sellCrops, awakenCrop, fuseFighters, setFighterLocked, setFighterFavorite, renameFighter, releaseFighter, dismantleFighter, setTeamPreset, renameTeamPreset, setDefaultTeamPreset, awardDungeonVictory, notifications, notify, onDismissNotification, initialFarmerTile, initialFarmerFacing, onFarmerSettled, onOpenGuide, context, onVisit, onReturnHome, cameraMode, setCameraMode }: Props & {
   context: WorldContext; onVisit: (snapshot: FriendFarmSnapshot) => void; onReturnHome: () => void; cameraMode: CameraMode; setCameraMode: (mode: CameraMode) => void;
 }) {
   const visiting = !canModifyFarm(context);
@@ -251,7 +252,7 @@ function PixelWorldScene({ coins, unlockedPlotCount: ownUnlockedPlotCount, plots
   }, [state.position, state.facing, state.moving, updateLocalMovement]);
   const players: WorldPlayer[] = [{
     userId: user?.id ?? "local", displayName: user?.globalName ?? user?.username ?? "Farmer", ...farmerWorldPosition,
-    facing: state.facing, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame,
+    facing: state.facing, direction: state.direction, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame, avatarId: selectedCharacterId,
   }];
 
   function selectPlayer(player: WorldPlayer) {

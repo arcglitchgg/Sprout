@@ -140,19 +140,22 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
     <div className="absolute inset-y-14 left-1/2 border-l-2 border-dashed border-[#637a45]/30" />
     {fighters.map((fighter) => <div key={fighter.id} data-side={fighter.side} data-slot={fighter.slot} className="battle-fighter-position absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${position(fighter).x}%`, top: `${position(fighter).y}%` }}>
       <BattleFighter fighter={fighter} hp={fighter.currentHp} slot={fighter.slot} scale={fighter.visualScale}
+        side={fighter.side}
         animationKey={active}
         dialogue={dialogue?.id === fighter.id ? dialogue.text : undefined}
         impact={phase === "reaction" && reaction === "hurt" && !intercept && event?.actualTargetId === fighter.id ? event.actionId === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : undefined}
         shield={false}
-        animation={showingAction && event?.actorId === fighter.id && event.actionId === "kernel-burst" ? actionAnimation : undefined}
+        animation={phase === "reaction" && event?.actualTargetId === fighter.id && !intercept
+          ? "guard"
+          : showingAction && event?.actorId === fighter.id && event.actionId === "kernel-burst" ? actionAnimation : undefined}
         moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.actionId !== "kernel-burst" || showingIntercept && recipient?.id === fighter.id))} />
     </div>)}
     {showingAction && event && actor && destination && <div key={`action-${active}`} className={`battle-traveler battle-${event.actionId}`} style={travel(actor, destination)} aria-hidden="true">
-      {event.actionId === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} /></span>}
+      {event.actionId === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} side={actor.side} /></span>}
     </div>}
     {showingIntercept && event && intercept && <div key={`guard-${active}`} className={`battle-traveler ${phase === "intercept-return" ? "battle-intercept-return" : "battle-intercept-engage"}`} style={travel(recipient, intended)} aria-hidden="true">
       <div className={`${phase === "reaction" && reaction === "hurt" ? event.actionId === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : ""} ${recipient.currentHp === 0 ? "battle-ko" : ""}`}>
-        <BattleSprite fighter={recipient} animation="guard" playbackKey={active} />
+        <BattleSprite fighter={recipient} animation="guard" playbackKey={active} side={recipient.side} />
       </div>
       <span className="absolute -top-3 right-0">🛡️</span>
     </div>}

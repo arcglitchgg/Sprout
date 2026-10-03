@@ -1,4 +1,5 @@
 import type { Fighter, Plot } from "@/lib/game-types";
+import type { PlayerMovementDirection } from "@/lib/player-avatar-data";
 
 export type SproutProfile = {
   userId: string;
@@ -29,4 +30,6 @@ export type WorldPlayer = {
   reconnecting?: boolean;
   frame?: number;
   moving?: boolean;
+  avatarId?: string;
+  direction?: PlayerMovementDirection;
 };

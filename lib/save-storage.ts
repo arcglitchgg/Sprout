@@ -109,7 +109,8 @@ function validSharedSave(value: Record<string, unknown>, plotCount: number, requ
   if (requireFighterProgression && game.defaultTeamPreset !== undefined && game.defaultTeamPreset !== 0 && game.defaultTeamPreset !== 1 && game.defaultTeamPreset !== 2) return false;
   if (requireFighterProgression && game.ascendantShards !== undefined && (!Number.isSafeInteger(game.ascendantShards) || (game.ascendantShards as number) < 0)) return false;
 
-  return validFarmerTile(value.world.farmerTile) && (value.world.facing === "left" || value.world.facing === "right");
+  return validFarmerTile(value.world.farmerTile) && (value.world.facing === "left" || value.world.facing === "right")
+    && (value.world.selectedCharacterId === undefined || typeof value.world.selectedCharacterId === "string");
 }
 
 export function validateSproutSaveV1(value: unknown): value is SproutSaveV1 {

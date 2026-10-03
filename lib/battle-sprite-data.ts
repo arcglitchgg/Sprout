@@ -1,42 +1,42 @@
-import type { CropType, PersonalityType } from "@/lib/game-types";
+import manifest from "@/lib/fighter-sprite-manifest.json";
+import type { CropType, MutationType, PersonalityType } from "@/lib/game-types";
 
 export type BattleAnimationName = "idle" | "normal-attack" | "guard" | "skill";
-export type BattleAnimation = { frames: string[]; frameDurationsMs: number[]; loop: boolean };
-type FighterAnimations = Partial<Record<BattleAnimationName, BattleAnimation>>;
-
-const root = "/assets/plant-animation-sprites/cleaned";
-const framePaths = (species: CropType, personality: PersonalityType, name: BattleAnimationName, count: number) =>
-  Array.from({ length: count }, (_, index) => `${root}/${species}/${personality}/${name}/frame-${String(index + 1).padStart(2, "0")}.png`);
-const animation = (species: CropType, personality: PersonalityType, name: BattleAnimationName, count: number, frameDurationsMs: number[], loop = false): BattleAnimation => ({
-  frames: framePaths(species, personality, name, count), frameDurationsMs, loop,
-});
-
-const personalityTypes: PersonalityType[] = ["angry", "protective", "lazy", "clever", "mean"];
-const speciesTypes: CropType[] = ["potato", "carrot", "corn"];
-const mapped = Object.fromEntries(speciesTypes.flatMap((species) => personalityTypes.map((personality) => [
-  `${species}:${personality}`,
-  {
-    idle: animation(species, personality, "idle", 1, [900], true),
-    "normal-attack": animation(species, personality, "normal-attack", 3, [450, 350, 500]),
-  } satisfies FighterAnimations,
-]))) as Record<`${CropType}:${PersonalityType}`, FighterAnimations>;
-
-const add = (species: CropType, personality: PersonalityType, name: BattleAnimationName, count: number, durations: number[]) => {
-  mapped[`${species}:${personality}`][name] = animation(species, personality, name, count, durations);
+export type FighterAssetAnimationName = "idle" | "normal_attack" | "defense" | "skill";
+export type FighterSpriteFrame = { x: number; y: number; width: number; height: number; duration: number };
+export type FighterSpriteDefinition = {
+  src: string; sheetWidth: number; sheetHeight: number; frameWidth: number; frameHeight: number;
+  facing: "left" | "right"; accessory: string | null;
+  animations: Record<FighterAssetAnimationName, { loop: boolean; frames: FighterSpriteFrame[] }>;
+};
+export type BattleAnimation = {
+  sprite: FighterSpriteDefinition;
+  frames: FighterSpriteFrame[];
+  frameDurationsMs: number[];
+  loop: boolean;
 };
 
-// Guard and Skill entries are deliberately limited to sets classified READY.
-add("potato", "mean", "guard", 2, [450, 950]);
-add("potato", "protective", "guard", 2, [450, 950]);
-for (const personality of personalityTypes) add("carrot", personality, "guard", 2, [450, 950]);
-for (const personality of ["angry", "clever", "lazy", "mean"] satisfies PersonalityType[]) add("corn", personality, "guard", 2, [450, 950]);
+export const BATTLE_TO_ASSET_ANIMATION: Record<BattleAnimationName, FighterAssetAnimationName> = {
+  idle: "idle",
+  "normal-attack": "normal_attack",
+  guard: "defense",
+  skill: "skill",
+};
 
-add("potato", "angry", "skill", 2, [700, 1200]);
-add("potato", "lazy", "skill", 2, [700, 1200]);
-add("corn", "angry", "skill", 3, [500, 650, 750]);
-add("corn", "lazy", "skill", 3, [500, 650, 750]);
+export const FIGHTER_SPRITE_REGISTRY = manifest as Record<string, FighterSpriteDefinition>;
+const battleAnimationCache = new Map<string, BattleAnimation>();
+export function resolveFighterSprite(fighter: { crop: CropType; mutation: MutationType; personality: PersonalityType }) {
+  return FIGHTER_SPRITE_REGISTRY[`${fighter.crop}:${fighter.mutation}:${fighter.personality}`] ?? null;
+}
 
-export const BATTLE_ANIMATIONS = mapped;
-export function getBattleAnimation(species: CropType, personality: PersonalityType, name: BattleAnimationName) {
-  return BATTLE_ANIMATIONS[`${species}:${personality}`][name];
+export function getBattleAnimation(species: CropType, mutation: MutationType, personality: PersonalityType, name: BattleAnimationName): BattleAnimation | undefined {
+  const cacheKey = `${species}:${mutation}:${personality}:${name}`;
+  const cached = battleAnimationCache.get(cacheKey);
+  if (cached) return cached;
+  const sprite = resolveFighterSprite({ crop: species, mutation, personality });
+  const animation = sprite?.animations[BATTLE_TO_ASSET_ANIMATION[name]];
+  if (!sprite || !animation) return undefined;
+  const resolved = { sprite, frames: animation.frames, frameDurationsMs: animation.frames.map((frame) => frame.duration), loop: animation.loop };
+  battleAnimationCache.set(cacheKey, resolved);
+  return resolved;
 }

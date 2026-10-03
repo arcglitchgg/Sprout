@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { findPath } from "@/lib/pathfinding";
 import { FARMER_ANIMATION } from "@/lib/sprite-data";
 import type { WorldDefinition, WorldPoint } from "@/lib/world-types";
+import type { PlayerMovementDirection } from "@/lib/player-avatar-data";
 
 export const MOVEMENT_TILES_PER_SECOND = 8;
 
@@ -11,6 +12,7 @@ export type WorldMovementState = {
   position: WorldPoint;
   tile: WorldPoint;
   facing: "left" | "right";
+  direction: PlayerMovementDirection;
   moving: boolean;
   frame: number;
 };
@@ -33,10 +35,11 @@ export function useWorldMovement(world: WorldDefinition, options: WorldMovementO
   const queuedDestination = useRef<WorldPoint | null>(null);
   const arrivalCallback = useRef<(() => void) | null>(null);
   const facing = useRef<"left" | "right">(initialFacing);
+  const direction = useRef<PlayerMovementDirection>(initialFacing);
   const onSettled = useRef(options.onSettled);
   const frameIndex = useRef(0);
   const frameElapsed = useRef(0);
-  const [state, setState] = useState<WorldMovementState>({ position: { ...initialTile }, tile: { ...initialTile }, facing: initialFacing, moving: false, frame: FARMER_ANIMATION.idleFrame });
+  const [state, setState] = useState<WorldMovementState>({ position: { ...initialTile }, tile: { ...initialTile }, facing: initialFacing, direction: initialFacing, moving: false, frame: FARMER_ANIMATION.idleFrame });
 
   useEffect(() => {
     onSettled.current = options.onSettled;
@@ -79,6 +82,8 @@ export function useWorldMovement(world: WorldDefinition, options: WorldMovementO
         const dy = next.y - position.current.y;
         if (dx > 0) facing.current = "right";
         if (dx < 0) facing.current = "left";
+        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) direction.current = dx > 0 ? "right" : "left";
+        else if (dy !== 0) direction.current = dy > 0 ? "down" : "up";
         const remaining = Math.hypot(dx, dy);
         const step = MOVEMENT_TILES_PER_SECOND * deltaSeconds;
         if (remaining <= step) {
@@ -115,7 +120,7 @@ export function useWorldMovement(world: WorldDefinition, options: WorldMovementO
         frameElapsed.current = 0;
       }
       const moving = route.current.length > 0;
-      setState({ position: { ...position.current }, tile: { ...tile.current }, facing: facing.current, moving, frame: moving ? FARMER_ANIMATION.walkFrames[frameIndex.current] : FARMER_ANIMATION.idleFrame });
+      setState({ position: { ...position.current }, tile: { ...tile.current }, facing: facing.current, direction: direction.current, moving, frame: moving ? FARMER_ANIMATION.walkFrames[frameIndex.current] : FARMER_ANIMATION.idleFrame });
       animationId = requestAnimationFrame(tick);
     };
     animationId = requestAnimationFrame(tick);

@@ -4,7 +4,7 @@ import type { WorldPlayer } from "@/lib/social-types";
 
 export default function WorldPlayerEntity({ player, onInteract, labelScale = 1 }: { player: WorldPlayer; onInteract?: (player: WorldPlayer) => void; labelScale?: number }) {
   return <div className="pointer-events-none absolute z-30" style={{ left: player.x, top: player.y }}>
-    <FarmerSprite frame={player.frame ?? FARMER_ANIMATION.idleFrame} facing={player.facing} moving={player.moving ?? false} />
+    <FarmerSprite frame={player.frame ?? FARMER_ANIMATION.idleFrame} facing={player.facing} direction={player.direction} moving={player.moving ?? false} avatarId={player.avatarId} />
     <span className="absolute bottom-[68px] left-0 max-w-40 origin-bottom truncate rounded-md border border-white/30 bg-[#172219]/90 px-2 py-1 text-center text-[15px] font-bold leading-tight text-[#fff8dc] shadow" style={{ transform: `translateX(-50%) scale(${labelScale})` }} title={player.displayName}>
       {player.isOwner ? "★ " : ""}{player.displayName}{player.reconnecting ? <span className="ml-1 text-amber-300" title="Reconnecting">· Reconnecting</span> : player.isOwner && !player.isLocal && player.online && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-lime-400" aria-label="Online" title="Online" />}
     </span>

@@ -15,14 +15,15 @@ export function LegacyBattleSprite({ crop }: { crop: Fighter["crop"] }) {
   </span>;
 }
 
-export default function BattleSprite({ fighter, animation = "idle", playbackKey, paused = false }: {
-  fighter: Pick<Fighter, "crop" | "personality">;
+export default function BattleSprite({ fighter, animation = "idle", playbackKey, paused = false, side }: {
+  fighter: Pick<Fighter, "crop" | "mutation" | "personality">;
   animation?: BattleAnimationName;
   playbackKey?: number | null;
   paused?: boolean;
+  side?: "player" | "enemy";
 }) {
-  const metadata = getBattleAnimation(fighter.crop, fighter.personality, animation);
-  const playbackId = `${fighter.crop}:${fighter.personality}:${animation}:${playbackKey ?? "rest"}`;
+  const metadata = getBattleAnimation(fighter.crop, fighter.mutation, fighter.personality, animation);
+  const playbackId = `${fighter.crop}:${fighter.mutation}:${fighter.personality}:${animation}:${playbackKey ?? "rest"}`;
   const [playback, setPlayback] = useState({ id: playbackId, frame: 0 });
   const frame = playback.id === playbackId ? playback.frame : 0;
 
@@ -47,11 +48,13 @@ export default function BattleSprite({ fighter, animation = "idle", playbackKey,
     return () => { cancelled = true; clearTimeout(timer); };
   }, [metadata, paused, playbackId]);
 
-  return <span className="battle-sprite-shell flex h-20 w-20 items-center justify-center" aria-hidden="true">
-    {metadata ? <>
-      {/* Local audited PNG frames retain nearest-neighbor rendering. */}
+  const selectedFrame = metadata?.frames[Math.min(frame, metadata.frames.length - 1)];
+  const mirror = metadata ? (metadata.sprite.facing === "right") === (side === "enemy") : false;
+  const scale = metadata ? 80 / metadata.sprite.frameWidth : 1;
+  return <span className="battle-sprite-shell flex h-20 w-20 items-center justify-center" aria-hidden="true" style={{ transform: mirror ? "scaleX(-1)" : undefined }}>
+    {metadata && selectedFrame ? <span className="relative block h-20 w-20 overflow-hidden">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt="" src={metadata.frames[Math.min(frame, metadata.frames.length - 1)]} draggable={false} className="battle-clean-sprite h-20 w-20 object-contain" />
-    </> : <LegacyBattleSprite crop={fighter.crop} />}
+      <img alt="" src={metadata.sprite.src} draggable={false} className="battle-clean-sprite absolute max-w-none" style={{ width: metadata.sprite.sheetWidth * scale, height: metadata.sprite.sheetHeight * scale, left: -selectedFrame.x * scale, top: -selectedFrame.y * scale }} />
+    </span> : <LegacyBattleSprite crop={fighter.crop} />}
   </span>;
 }
