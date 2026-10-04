@@ -9,6 +9,8 @@ import { TRAINING_TEAM } from "@/lib/battle-data";
 import { ACTIONS } from "@/lib/skill-data";
 import BattleFighter from "@/components/BattleFighter";
 import BattleSprite from "@/components/BattleSprite";
+import BattleEffectSprite from "@/components/BattleEffectSprite";
+import { CARROT_ASCENDED_BACKSTAB_EFFECT, getCarrotBackstabPresentation } from "@/lib/battle-effect-data";
 import "./battle-arena.css";
 
 type PlacedFighter = Fighter & { side: "player" | "enemy"; slot: number; currentHp: number };
@@ -127,6 +129,11 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
   const intercept = recipient && intended && recipient.id !== intended.id;
   const destination = intercept ? intended : recipient;
   const actionAnimation = event?.actionId === "basic" ? "normal-attack" as const : "skill" as const;
+  const backstabPresentation = event?.actionId === "backstab" && actor
+    ? getCarrotBackstabPresentation(actor.crop, actor.mutation)
+    : null;
+  const carrotBackstab = backstabPresentation !== null;
+  const ascendedCarrotBackstab = backstabPresentation === "ascended-effect";
   const showingAction = phase === "action" || phase === "reaction";
   const showingIntercept = Boolean(intercept && (showingAction || phase === "intercept-return"));
   const travel = (from: PlacedFighter, to: PlacedFighter): CSSProperties => ({
@@ -148,10 +155,18 @@ export default function BattleArena({ battle, team, previewEnemyTeam = TRAINING_
         animation={phase === "reaction" && event?.actualTargetId === fighter.id && !intercept
           ? "guard"
           : showingAction && event?.actorId === fighter.id && event.actionId === "kernel-burst" ? actionAnimation : undefined}
-        moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.actionId !== "kernel-burst" || showingIntercept && recipient?.id === fighter.id))} />
+        vanishing={Boolean(carrotBackstab && showingAction && actor?.id === fighter.id)}
+        moving={Boolean(event && (showingAction && actor?.id === fighter.id && event.actionId !== "kernel-burst" && !carrotBackstab || showingIntercept && recipient?.id === fighter.id))} />
     </div>)}
-    {showingAction && event && actor && destination && <div key={`action-${active}`} className={`battle-traveler battle-${event.actionId}`} style={travel(actor, destination)} aria-hidden="true">
+    {showingAction && event && actor && destination && !carrotBackstab && <div key={`action-${active}`} className={`battle-traveler battle-${event.actionId}`} style={travel(actor, destination)} aria-hidden="true">
       {event.actionId === "kernel-burst" ? <span className="text-2xl text-yellow-300 [text-shadow:1px_1px_#634020]">● · ●</span> : <span className="block" style={{ transform: `scale(${actor.visualScale ?? 1})`, transformOrigin: "bottom center" }}><BattleSprite fighter={actor} animation={actionAnimation} playbackKey={active} side={actor.side} /></span>}
+    </div>}
+    {showingAction && ascendedCarrotBackstab && recipient && active !== null && <div
+      className="battle-backstab-effect pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2"
+      style={{ left: `${position(recipient).x}%`, top: `${position(recipient).y}%` }}
+      aria-hidden="true"
+    >
+      <BattleEffectSprite effect={CARROT_ASCENDED_BACKSTAB_EFFECT} playbackKey={active} />
     </div>}
     {showingIntercept && event && intercept && <div key={`guard-${active}`} className={`battle-traveler ${phase === "intercept-return" ? "battle-intercept-return" : "battle-intercept-engage"}`} style={travel(recipient, intended)} aria-hidden="true">
       <div className={`${phase === "reaction" && reaction === "hurt" ? event.actionId === "heavy-slam" ? "battle-impact-heavy" : "battle-impact" : ""} ${recipient.currentHp === 0 ? "battle-ko" : ""}`}>

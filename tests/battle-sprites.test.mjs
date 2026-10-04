@@ -19,6 +19,7 @@ function load(name) {
 }
 
 const { FIGHTER_SPRITE_REGISTRY, BATTLE_TO_ASSET_ANIMATION, getBattleAnimation, resolveFighterSprite } = load("@/lib/battle-sprite-data");
+const { CARROT_ASCENDED_BACKSTAB_EFFECT, getCarrotBackstabPresentation } = load("@/lib/battle-effect-data");
 const species = ["potato", "carrot", "corn"];
 const rarities = ["normal", "large", "golden", "prismatic", "ascended"];
 const personalities = ["angry", "protective", "lazy", "clever", "mean"];
@@ -93,4 +94,43 @@ test("protective intercept presentation remains unchanged", () => {
   assert.match(arena, /INTERCEPT_RETURN_DURATION_MS = 400/);
   assert.match(arena, /setPhase\("intercept-return"\)/);
   assert.match(css, /@keyframes battle-intercept-engage/);
+});
+
+test("Normal through Prismatic Carrot Backstab uses the stationary vanish presentation", () => {
+  for (const mutation of ["normal", "large", "golden", "prismatic"]) {
+    assert.equal(getCarrotBackstabPresentation("carrot", mutation), "vanish");
+  }
+  assert.equal(getCarrotBackstabPresentation("potato", "ascended"), null);
+  assert.equal(getCarrotBackstabPresentation("corn", "ascended"), null);
+});
+
+test("Ascended Carrot Backstab uses the supplied four-frame effect at impact", () => {
+  assert.equal(getCarrotBackstabPresentation("carrot", "ascended"), "ascended-effect");
+  assert.equal(CARROT_ASCENDED_BACKSTAB_EFFECT.src.endsWith("/Carrot_Skill.png"), true);
+  assert.deepEqual(
+    [CARROT_ASCENDED_BACKSTAB_EFFECT.sheetWidth, CARROT_ASCENDED_BACKSTAB_EFFECT.sheetHeight],
+    [128, 128],
+  );
+  assert.equal(CARROT_ASCENDED_BACKSTAB_EFFECT.frames.length, 4);
+  assert.ok(CARROT_ASCENDED_BACKSTAB_EFFECT.frames.every((frame) => frame.width === 32 && frame.height === 64 && frame.y === 32));
+  assert.equal(CARROT_ASCENDED_BACKSTAB_EFFECT.frames.slice(0, 3).reduce((total, frame) => total + frame.duration, 0), 1150);
+});
+
+test("Backstab remains at formation position while its resolved target receives the effect and hit", () => {
+  const arena = readFileSync("components/BattleArena.tsx", "utf8");
+  const css = readFileSync("components/battle-arena.css", "utf8");
+  assert.match(arena, /!carrotBackstab && <div key={`action-/);
+  assert.match(arena, /vanishing=\{Boolean\(carrotBackstab && showingAction && actor\?\.id === fighter\.id\)\}/);
+  assert.match(arena, /left: `\$\{position\(recipient\)\.x\}%`/);
+  assert.match(arena, /phase === "reaction" && reaction === "hurt"/);
+  assert.match(css, /@keyframes battle-backstab-vanish/);
+  assert.doesNotMatch(css, /@keyframes battle-dash/);
+});
+
+test("Backstab presentation does not alter logical battle resolution", () => {
+  const battle = readFileSync("lib/battle.ts", "utf8");
+  assert.doesNotMatch(battle, /battle-effect-data|Carrot_Skill|backstab-vanish/);
+  const arena = readFileSync("components/BattleArena.tsx", "utf8");
+  assert.match(arena, /event\?\.actualTargetId/);
+  assert.match(arena, /applyBattleVisualEvent/);
 });
