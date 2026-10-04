@@ -9,6 +9,7 @@ import { CHALLENGE_MS, validChallengePacket, type ChallengeEvent, type Challenge
 import { socialRequest } from "@/lib/social-client";
 import type { LivePvpMatch } from "@/lib/pvp-types";
 import { reconcilePresence } from "@/lib/presence-grace";
+import type { FarmPresencePayload } from "@/lib/social-types";
 
 export function farmRoom(ownerId: string) {
   if (!/^\d{5,25}$/.test(ownerId)) throw new Error("Invalid farm owner.");
@@ -25,15 +26,34 @@ export function presentUserIds(state: Record<string, unknown[]>) {
     entry && typeof entry === "object" && "userId" in entry && typeof entry.userId === "string" && /^\d{5,25}$/.test(entry.userId) ? [entry.userId] : [])))].sort();
 }
 
-export function useFarmPresence(session: string | null, userId: string | null, ownerId: string | null) {
+export function presenceAvatarIds(state: Record<string, unknown[]>) {
+  const avatars: Record<string, string> = {};
+  for (const entries of Object.values(state)) for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const payload = entry as Partial<FarmPresencePayload>;
+    if (typeof payload.userId === "string" && /^\d{5,25}$/.test(payload.userId)
+      && typeof payload.selectedCharacterId === "string") avatars[payload.userId] = payload.selectedCharacterId;
+  }
+  return avatars;
+}
+
+export function createFarmPresencePayload(userId: string, ownerId: string, selectedCharacterId?: string): FarmPresencePayload {
+  return { userId, isOwner: userId === ownerId, joinedAt: Date.now(), ...(selectedCharacterId ? { selectedCharacterId } : {}) };
+}
+
+export function useFarmPresence(session: string | null, userId: string | null, ownerId: string | null, selectedCharacterId?: string) {
   const [ownerOnline, setOwnerOnline] = useState(false);
   const [presentIds, setPresentIds] = useState<string[]>([]);
   const [reconnectingIds, setReconnectingIds] = useState<string[]>([]);
+  const [avatarIds, setAvatarIds] = useState<Record<string, string>>({});
   const [challenge, setChallenge] = useState<ChallengeState | null>(null);
   const [challengeMessage, setChallengeMessage] = useState<string | null>(null);
   const challengeRef = useRef<ChallengeState | null>(null);
   const challengeSend = useRef<((event: ChallengeEvent, packet: ChallengePacket) => Promise<boolean>) | null>(null);
   const membersRef = useRef<Set<string>>(new Set());
+  const selectedCharacterIdRef = useRef(selectedCharacterId);
+  selectedCharacterIdRef.current = selectedCharacterId;
+  const presenceTrackRef = useRef<(() => void) | null>(null);
   const observedRef = useRef<Set<string>>(new Set());
   const graceRef = useRef(new Map<string, number>());
   const presentKeyRef = useRef("");
@@ -85,6 +105,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
     latestLocal.current = movement;
     sendRef.current?.(movement, false);
   }, []);
+  useEffect(() => { presenceTrackRef.current?.(); }, [selectedCharacterId]);
   useEffect(() => {
     if (!session || !userId || !ownerId) { remoteStore.clear(); realtimeStage("session-unavailable"); return; }
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) { remoteStore.clear(); realtimeStage("browser-config-missing"); return; }
@@ -120,6 +141,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
       reconcile(new Set());
       sendRef.current = null;
       challengeSend.current = null;
+      presenceTrackRef.current = null;
       try {
         realtimeStage("token-fetch-start");
         const credentials = await requestRealtimeToken(session!, controller.signal);
@@ -209,6 +231,7 @@ export function useFarmPresence(session: string | null, userId: string | null, o
           if (!closed && !retired) {
             const state = channel.presenceState() as Record<string, unknown[]>;
             const ids = presentUserIds(state);
+            setAvatarIds(presenceAvatarIds(state));
             const joined = ids.some((id) => id !== userId && !membersRef.current.has(id));
             reconcile(new Set(ids));
             if (joined && latestLocal.current) sendRef.current?.(latestLocal.current, true);
@@ -227,21 +250,25 @@ export function useFarmPresence(session: string | null, userId: string | null, o
           if (status === "SUBSCRIBED") {
             subscribed = true;
             realtimeStage("subscribed");
-            void channel.track({ userId, isOwner: userId === ownerId, joinedAt: Date.now() }).then((result) => {
-              if (!closed) realtimeStage(result === "ok" ? "presence-track-ok" : "presence-track-failed", result);
-            }).catch((reason: unknown) => { if (!closed) realtimeStage("presence-track-failed", realtimeErrorKind(reason)); });
+            presenceTrackRef.current = () => {
+              void channel.track(createFarmPresencePayload(userId!, ownerId!, selectedCharacterIdRef.current)).then((result) => {
+                if (!closed) realtimeStage(result === "ok" ? "presence-track-ok" : "presence-track-failed", result);
+              }).catch((reason: unknown) => { if (!closed) realtimeStage("presence-track-failed", realtimeErrorKind(reason)); });
+            };
+            presenceTrackRef.current();
             if (latestLocal.current) sendRef.current?.(latestLocal.current, true);
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             logRealtimeTransportDisconnect();
             subscribed = false;
             challengeSend.current = null;
+            presenceTrackRef.current = null;
             reconcile(new Set());
             if (status === "CHANNEL_ERROR") realtimeStage("channel-error", safeRealtimeChannelError(error), inspectRealtimeChannelError(error) ?? undefined);
             else realtimeStage(status === "TIMED_OUT" ? "socket-or-network-failed" : "channel-closed");
             if (reconnectTimer === undefined) reconnectTimer = window.setTimeout(() => { reconnectTimer = undefined; void connect(); }, 1500);
           }
         });
-        cleanup = () => { retired = true; subscribed = false; sendRef.current = null; challengeSend.current = null; realtimeStage("leaving-room"); void channel.untrack().catch(() => {}); void client.removeChannel(channel); };
+        cleanup = () => { retired = true; subscribed = false; sendRef.current = null; challengeSend.current = null; presenceTrackRef.current = null; realtimeStage("leaving-room"); void channel.untrack().catch(() => {}); void client.removeChannel(channel); };
       } catch (error) {
         if (!closed) {
           if (error instanceof SessionDisconnectedError) {
@@ -270,8 +297,8 @@ export function useFarmPresence(session: string | null, userId: string | null, o
         if (match.status === "cancelled" || match.status === "expired") { changeChallenge(null); setChallengeMessage(match.status === "expired" ? "Challenge expired" : "Challenge declined"); }
       }).catch(() => {});
     }, 1000);
-    return () => { closed = true; controller.abort(); window.clearInterval(refresh); window.clearInterval(timeout); window.clearInterval(poll); if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer); graceDeadlines.clear(); observedRef.current.clear(); presentKeyRef.current = ""; reconnectingKeyRef.current = ""; sendRef.current = null; challengeSend.current = null; membersRef.current = new Set(); remoteStore.clear(); cleanup?.(); };
+    return () => { closed = true; controller.abort(); window.clearInterval(refresh); window.clearInterval(timeout); window.clearInterval(poll); if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer); graceDeadlines.clear(); observedRef.current.clear(); presentKeyRef.current = ""; reconnectingKeyRef.current = ""; sendRef.current = null; challengeSend.current = null; presenceTrackRef.current = null; membersRef.current = new Set(); setAvatarIds({}); remoteStore.clear(); cleanup?.(); };
   }, [session, userId, ownerId, remoteStore, changeChallenge]);
   const active = !!(session && userId && ownerId);
-  return { ownerOnline: active && ownerOnline, presentIds: active ? presentIds : [], reconnectingIds: active ? reconnectingIds : [], remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge };
+  return { ownerOnline: active && ownerOnline, presentIds: active ? presentIds : [], reconnectingIds: active ? reconnectingIds : [], avatarIds: active ? avatarIds : {}, remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge };
 }

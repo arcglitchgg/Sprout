@@ -34,14 +34,30 @@ test("unknown and absent avatar IDs safely resolve to the original farmer", () =
   assert.equal(normalizePlayerAvatarId("character-667449"), "character-667449");
 });
 
+test("remote avatar IDs use the same registry and safe fallback as local avatars", () => {
+  const entity = readFileSync("components/WorldPlayerEntity.tsx", "utf8");
+  const layer = readFileSync("components/RemotePlayersLayer.tsx", "utf8");
+  assert.match(entity, /player\.selectedCharacterId \?\? player\.avatarId/);
+  assert.match(layer, /selectedCharacterId: avatarIds\[remote\.userId\]/);
+  assert.equal(resolvePlayerAvatar("character-893205").id, "character-893205");
+  assert.equal(resolvePlayerAvatar("unknown-remote-avatar").id, DEFAULT_PLAYER_AVATAR_ID);
+});
+
+test("avatar changes retrack Presence without reconnecting the farm room", () => {
+  const hook = readFileSync("hooks/useFarmPresence.ts", "utf8");
+  assert.match(hook, /useEffect\(\(\) => \{ presenceTrackRef\.current\?\.\(\); \}, \[selectedCharacterId\]\)/);
+  assert.doesNotMatch(hook, /\[session, userId, ownerId, selectedCharacterId,/);
+  assert.match(hook, /createFarmPresencePayload\(userId!, ownerId!, selectedCharacterIdRef\.current\)/);
+});
+
 test("overworld and Main Menu are wired to selectedCharacterId", () => {
   const game = readFileSync("components/SproutGame.tsx", "utf8");
   const world = readFileSync("components/PixelWorld.tsx", "utf8");
   const entity = readFileSync("components/WorldPlayerEntity.tsx", "utf8");
   const menu = readFileSync("components/MainMenu.tsx", "utf8");
   assert.match(game, /world: \{ \.\.\.farmerWorld, selectedCharacterId \}/);
-  assert.match(world, /avatarId: selectedCharacterId/);
-  assert.match(entity, /avatarId=\{player\.avatarId\}/);
+  assert.match(world, /selectedCharacterId,/);
+  assert.match(entity, /avatarId=\{player\.selectedCharacterId \?\? player\.avatarId\}/);
   assert.match(menu, /PlayerAvatarSelector/);
 });
 

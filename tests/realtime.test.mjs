@@ -132,7 +132,7 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
   try {
     assert.equal(hook.farmRoom("11111"), "farm:11111");
     assert.throws(() => hook.farmRoom("other"));
-    const home = hook.useFarmPresence("session", "11111", "11111");
+    const home = hook.useFarmPresence("session", "11111", "11111", "character-667449");
     home.updateLocalMovement({ x: 500, y: 600, facing: "right", moving: false });
     const leaveHome = effects.pop()();
     cleanups.push(leaveHome);
@@ -147,12 +147,14 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
     assert.equal(channels[0].sent.length, 2, "start sends immediately; intermediate frames are throttled");
     home.updateLocalMovement({ x: 520, y: 600, facing: "right", moving: false });
     assert.equal(channels[0].sent.length, 3, "stop sends immediately");
-    channels[0].state = { "11111": [{ userId: "11111", isOwner: true }], "22222": [{ userId: "22222", isOwner: false }] };
+    channels[0].state = { "11111": [{ userId: "11111", isOwner: true, selectedCharacterId: "character-667449" }], "22222": [{ userId: "22222", isOwner: false, selectedCharacterId: "character-893205" }] };
     channels[0].sync();
     channels[0].movement({ payload: { userId: "22222", seq: 1, x: 700, y: 700, facing: "left", moving: true, timestamp: 1 } });
     assert.equal(home.remoteStore.getSnapshot()[0].userId, "22222");
-    assert.deepEqual(Object.keys(channels[0].payload).sort(), ["isOwner", "joinedAt", "userId"]);
+    assert.deepEqual(Object.keys(channels[0].payload).sort(), ["isOwner", "joinedAt", "selectedCharacterId", "userId"]);
     assert.equal(channels[0].payload.isOwner, true);
+    assert.equal(channels[0].payload.selectedCharacterId, "character-667449");
+    assert.deepEqual(hook.presenceAvatarIds(channels[0].state), { "11111": "character-667449", "22222": "character-893205" });
     leaveHome();
     assert.equal(home.remoteStore.getSnapshot().length, 0);
     assert.equal(channels[0].untracked, true);
@@ -182,6 +184,7 @@ test("farm room lifecycle tracks only identity, leaves on switch/return, and mar
     assert.equal(channels[2].removed, true);
     assert.equal(hook.ownerIsPresent({ x: [{ userId: "11111", isOwner: false }] }, "11111"), false);
     assert.deepEqual(hook.presentUserIds({ a: [{ userId: "11111" }], b: [{ userId: "22222" }, { userId: "22222" }, { userId: "invalid" }] }), ["11111", "22222"]);
+    assert.deepEqual(hook.presenceAvatarIds({ a: [{ userId: "11111", selectedCharacterId: "unknown-avatar" }], b: [{ userId: "invalid", selectedCharacterId: "character-667449" }] }), { "11111": "unknown-avatar" });
   } finally { cleanups.forEach((cleanup) => cleanup()); process.env = original; globalThis.window = previousWindow; }
 });
 

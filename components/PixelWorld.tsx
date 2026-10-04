@@ -95,7 +95,7 @@ function PixelWorldScene({ selectedCharacterId, coins, unlockedPlotCount: ownUnl
   const plots = context.mode === "visiting" ? context.snapshot.plots : ownPlots;
   const unlockedPlotCount = context.mode === "visiting" ? context.snapshot.unlockedPlotCount : ownUnlockedPlotCount;
   const { user, session } = useDiscord();
-  const { ownerOnline, presentIds, reconnectingIds, remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null);
+  const { ownerOnline, presentIds, reconnectingIds, avatarIds, remoteStore, updateLocalMovement, challenge, challengeMessage, requestChallenge, respondChallenge, dismissChallenge } = useFarmPresence(session, user?.id ?? null, context.mode === "visiting" ? context.ownerId : user?.id ?? null, selectedCharacterId);
   const [remoteProfiles, setRemoteProfiles] = useState<Record<string, { displayName: string | null; username: string }>>({});
   const [challengeTarget, setChallengeTarget] = useState<{ userId: string; displayName: string } | null>(null);
   const roomIds = presentIds.filter((id) => id !== user?.id).join(",");
@@ -252,7 +252,7 @@ function PixelWorldScene({ selectedCharacterId, coins, unlockedPlotCount: ownUnl
   }, [state.position, state.facing, state.moving, updateLocalMovement]);
   const players: WorldPlayer[] = [{
     userId: user?.id ?? "local", displayName: user?.globalName ?? user?.username ?? "Farmer", ...farmerWorldPosition,
-    facing: state.facing, direction: state.direction, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame, avatarId: selectedCharacterId,
+    facing: state.facing, direction: state.direction, isOwner: !visiting, isLocal: true, online: true, moving: state.moving, frame: state.frame, selectedCharacterId,
   }];
 
   function selectPlayer(player: WorldPlayer) {
@@ -407,7 +407,7 @@ function PixelWorldScene({ selectedCharacterId, coins, unlockedPlotCount: ownUnl
       <div ref={viewportRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onWheel={handleWheel} onClickCapture={(event) => { const pointerId = (event.nativeEvent as PointerEvent).pointerId; if (cameraClickGuard.consume(pointerId)) { event.preventDefault(); event.stopPropagation(); } }} className="relative min-h-0 w-full flex-1 touch-none overflow-hidden rounded-xl border border-white/10 bg-[#101512]">
         <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ width: WORLD_PIXEL_WIDTH, height: WORLD_PIXEL_HEIGHT, transform: `matrix(${camera.scale}, 0, 0, ${camera.scale}, ${camera.x}, ${camera.y})`, imageRendering: "pixelated" }}>
           <WorldMap world={FIRST_WORLD} players={players} moveTo={moveInWorld} plots={plots} unlockedPlotCount={unlockedPlotCount} now={now} onPlotClick={selectPlot} onBuildingClick={selectBuilding} onPlayerClick={selectPlayer} screenToWorld={screenToWorld} readOnly={visiting} labelScale={Math.max(1, 0.8 / camera.scale)} debug={debug} />
-          <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} reconnectingIds={reconnectingIds} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
+          <RemotePlayersLayer store={remoteStore} localId={user?.id ?? null} ownerId={context.mode === "visiting" ? context.ownerId : null} ownerName={context.mode === "visiting" ? context.snapshot.owner.displayName ?? context.snapshot.owner.username : null} ownerFallback={ownerPosition} ownerOnline={ownerOnline} reconnectingIds={reconnectingIds} avatarIds={avatarIds} profiles={remoteProfiles} labelScale={Math.max(1, 0.8 / camera.scale)} onInteract={selectPlayer} />
         </div>
         <WorldNotifications notifications={notifications} onDismiss={onDismissNotification} />
         {!visiting && <div data-camera-ui className="sprout-world-bottom-controls pointer-events-none absolute z-40 flex flex-wrap items-end justify-between gap-1.5" aria-label="Farm quick actions">

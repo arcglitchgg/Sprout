@@ -7,10 +7,11 @@ import { remoteWorldPlayer, type RemoteMovementStore } from "@/lib/remote-moveme
 import { playerName } from "@/lib/challenges";
 import type { WorldPlayer } from "@/lib/social-types";
 
-export default function RemotePlayersLayer({ store, localId, ownerId, ownerName, ownerFallback, ownerOnline, reconnectingIds, profiles, labelScale, onInteract }: {
+export default function RemotePlayersLayer({ store, localId, ownerId, ownerName, ownerFallback, ownerOnline, reconnectingIds, avatarIds = {}, profiles, labelScale, onInteract }: {
   store: RemoteMovementStore; localId: string | null; ownerId: string | null;
   ownerName: string | null; ownerFallback: { x: number; y: number };
   profiles: Record<string, { displayName: string | null; username: string }>;
+  avatarIds?: Record<string, string>;
   ownerOnline: boolean; reconnectingIds: string[]; labelScale: number; onInteract: (player: WorldPlayer) => void;
 }) {
   const remotes = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -36,12 +37,13 @@ export default function RemotePlayersLayer({ store, localId, ownerId, ownerName,
     .map((remote) => ({
       ...remoteWorldPlayer(remote, playerName(remote.userId, profiles, ownerId ? { userId: ownerId, displayName: ownerName } : null), ownerId ?? ""),
       reconnecting: reconnectingIds.includes(remote.userId),
+      selectedCharacterId: avatarIds[remote.userId],
       frame: remote.moving ? FARMER_ANIMATION.walkFrames[frameIndex] : FARMER_ANIMATION.idleFrame,
     }));
   if (ownerId && !players.some((player) => player.userId === ownerId)) {
     players.push({ userId: ownerId, displayName: ownerName ?? "Farm owner", ...ownerFallback,
       facing: "left", isOwner: true, isLocal: false, online: ownerOnline, reconnecting: reconnectingIds.includes(ownerId),
-      moving: false, frame: FARMER_ANIMATION.idleFrame });
+      moving: false, frame: FARMER_ANIMATION.idleFrame, selectedCharacterId: avatarIds[ownerId] });
   }
   return <div className="pointer-events-none absolute inset-0 z-30">
     {players.sort((a, b) => a.y - b.y || a.userId.localeCompare(b.userId))
