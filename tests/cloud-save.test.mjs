@@ -93,19 +93,50 @@ test("client protocol loads cloud save and uploads a first revision", async () =
     assert.equal(await putCloudSave("private-session", validSave, null), 1);
     assert.equal(JSON.parse(calls[1][1].body).revision, null);
     assert.equal(calls[1][1].headers.Authorization, "Bearer private-session");
+    assert.equal("keepalive" in calls[1][1], false);
   } finally { globalThis.fetch = previous; }
 });
 
 test("failed cloud request leaves local save storage untouched", async () => {
-  const { putCloudSave } = load("lib/cloud-save-client.ts", {
+  const { CloudSaveError, putCloudSave } = load("lib/cloud-save-client.ts", {
     "@/lib/save-storage": { migrateSproutSave: (save) => save },
-    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session) },
+    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session), SessionDisconnectedError: class extends Error {} },
   });
   const previous = globalThis.fetch;
   const local = JSON.stringify(validSave);
   globalThis.fetch = async () => { throw new Error("offline"); };
   try {
-    await assert.rejects(() => putCloudSave("private-session", validSave, 3), /offline/);
+    await assert.rejects(() => putCloudSave("private-session", validSave, 3), (error) => error instanceof CloudSaveError && error.kind === "network");
     assert.equal(JSON.stringify(validSave), local);
+  } finally { globalThis.fetch = previous; }
+});
+
+test("cloud client classifies permanent HTTP and invalid response failures", async () => {
+  const runtime = load("lib/cloud-save-client.ts", {
+    "@/lib/save-storage": { migrateSproutSave: (save) => save },
+    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session), SessionDisconnectedError: class extends Error {} },
+  });
+  const previous = globalThis.fetch;
+  try {
+    for (const [status, kind] of [[400, "validation"], [413, "payload_too_large"], [503, "server_unavailable"]]) {
+      globalThis.fetch = async () => new Response(JSON.stringify({ error: "safe" }), { status });
+      await assert.rejects(() => runtime.putCloudSave("session", validSave, 2), (error) => error.kind === kind && error.status === status);
+    }
+    globalThis.fetch = async () => new Response("not-json", { status: 200 });
+    await assert.rejects(() => runtime.putCloudSave("session", validSave, 2), (error) => error.kind === "invalid_response");
+  } finally { globalThis.fetch = previous; }
+});
+
+test("cloud client distinguishes timeout from network rejection", async () => {
+  const runtime = load("lib/cloud-save-client.ts", {
+    "@/lib/save-storage": { migrateSproutSave: (save) => save },
+    "@/lib/session-client": { authenticatedRequest: (_session, request) => request(_session), SessionDisconnectedError: class extends Error {} },
+  });
+  const previous = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => { throw new DOMException("timed out", "TimeoutError"); };
+    await assert.rejects(() => runtime.putCloudSave("session", validSave, 2), (error) => error.kind === "timeout");
+    globalThis.fetch = async () => { throw new TypeError("network unavailable"); };
+    await assert.rejects(() => runtime.putCloudSave("session", validSave, 2), (error) => error.kind === "network");
   } finally { globalThis.fetch = previous; }
 });

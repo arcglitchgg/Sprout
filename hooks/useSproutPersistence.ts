@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDiscord } from "@/hooks/useDiscord";
-import { fetchCloudSave, putCloudSave } from "@/lib/cloud-save-client";
+import { CloudSaveError, cloudSavePayloadBytes, fetchCloudSave, putCloudSave } from "@/lib/cloud-save-client";
+import { cloudRetryDelay, timedOutSaveCommitted } from "@/lib/cloud-save-retry";
+import { logCloudSaveDiagnostic } from "@/lib/cloud-save-diagnostics";
 import { discordSaveKey, loadSproutSave, readSaveAcknowledgement, writeSaveAcknowledgement, writeSproutSave } from "@/lib/save-storage";
 import { canRetryLocalAfterConflict, chooseStartupSave, revisionForWrite, revisionFromSnapshot, UNKNOWN_CLOUD_REVISION } from "@/lib/save-reconciliation";
 import type { CloudRevisionState } from "@/lib/save-reconciliation";
@@ -29,6 +31,9 @@ export function useSproutPersistence() {
   const inFlight = useRef(false);
   const dirty = useRef(false);
   const conflictPaused = useRef(false);
+  const retryPaused = useRef(false);
+  const retryCount = useRef(0);
+  const attemptSequence = useRef(0);
   const localFailed = useRef(false);
   const hydratedUser = useRef<string | null>(null);
   const unknownWithoutLocal = useRef(false);
@@ -61,9 +66,17 @@ export function useSproutPersistence() {
   const flushCloud = useCallback(async () => {
     if (cloudTimer.current) clearTimeout(cloudTimer.current);
     cloudTimer.current = null;
-    if (!cloudSession.current || !dirty.current || inFlight.current || !latest.current) return;
+    if (!cloudSession.current || !dirty.current || inFlight.current || retryPaused.current || !latest.current) return;
     inFlight.current = true;
     const sending = latest.current;
+    const attemptId = ++attemptSequence.current;
+    const startedAt = performance.now();
+    const startingRevision = cloudRevision.current;
+    const diagnosticRevision = startingRevision.kind === "known" ? startingRevision.revision : null;
+    let payloadBytes = cloudSavePayloadBytes(sending, diagnosticRevision);
+    let failure: CloudSaveError | null = null;
+    let retryDelay: number | null = null;
+    let reconciliation: "committed" | "still-dirty" | "conflict" | "failed" | undefined;
     showStatus("saving");
     try {
       if (cloudRevision.current.kind === "unknown") {
@@ -90,11 +103,19 @@ export function useSproutPersistence() {
 
       const expectedRevision = revisionForWrite(cloudRevision.current);
       if (expectedRevision === undefined) throw new Error("Cloud revision is unknown.");
+      payloadBytes = cloudSavePayloadBytes(sending, expectedRevision);
+      logCloudSaveDiagnostic("start", {
+        attemptId, payloadBytes, revisionState: cloudRevision.current.kind,
+        revision: typeof expectedRevision === "number" ? expectedRevision : null,
+        durationMs: 0, retryCount: retryCount.current,
+      });
       dirty.current = false;
       const result = await putCloudSave(cloudSession.current, sending, expectedRevision);
       if (result !== "conflict") {
         cloudRevision.current = { kind: "known", revision: result };
         conflictPaused.current = false;
+        retryPaused.current = false;
+        retryCount.current = 0;
         acknowledge(sending, result);
         showStatus(dirty.current || latest.current !== sending ? "saving" : "saved");
         return;
@@ -120,17 +141,71 @@ export function useSproutPersistence() {
       }
       cloudRevision.current = { kind: "known", revision: retry };
       conflictPaused.current = false;
+      retryPaused.current = false;
+      retryCount.current = 0;
       acknowledge(retrying, retry);
       dirty.current = latest.current !== retrying;
       showStatus(dirty.current ? "saving" : "saved");
     } catch (error) {
       dirty.current = true;
       conflictPaused.current = false;
-      if (error instanceof SessionDisconnectedError) cloudSession.current = null;
+      if (error instanceof SessionDisconnectedError) {
+        cloudSession.current = null;
+        retryPaused.current = true;
+      } else {
+        failure = error instanceof CloudSaveError ? error : new CloudSaveError("unknown");
+        if (failure.kind === "timeout" && cloudSession.current) {
+          try {
+            const remote = await fetchCloudSave(cloudSession.current);
+            cloudRevision.current = revisionFromSnapshot(remote.revision);
+            if (timedOutSaveCommitted(sending, remote) && remote.revision !== null) {
+              acknowledge(sending, remote.revision);
+              dirty.current = latest.current !== sending;
+              retryPaused.current = false;
+              retryCount.current = 0;
+              reconciliation = "committed";
+              showStatus(dirty.current ? "saving" : "saved");
+              return;
+            }
+            const retrying = latest.current;
+            if (retrying && canRetryLocalAfterConflict(retrying, remote.save)) {
+              reconciliation = "still-dirty";
+              retryDelay = cloudRetryDelay("timeout", retryCount.current++);
+              retryPaused.current = false;
+            } else {
+              reconciliation = "conflict";
+              conflictPaused.current = true;
+              retryPaused.current = false;
+              showStatus("conflict");
+              return;
+            }
+          } catch (reconciliationError) {
+            reconciliation = "failed";
+            cloudRevision.current = UNKNOWN_CLOUD_REVISION;
+            if (reconciliationError instanceof SessionDisconnectedError) {
+              cloudSession.current = null;
+              retryPaused.current = true;
+            } else {
+              retryDelay = cloudRetryDelay("timeout", retryCount.current++);
+            }
+          }
+        } else {
+          retryDelay = cloudRetryDelay(failure.kind, retryCount.current++);
+          retryPaused.current = retryDelay === null;
+        }
+      }
       showStatus("cloud-failed");
     } finally {
       inFlight.current = false;
-      if (dirty.current && !conflictPaused.current && cloudSession.current) cloudTimer.current = setTimeout(() => { void flushCloudRef.current(); }, CLOUD_DELAY_MS);
+      const durationMs = Math.round(performance.now() - startedAt);
+      logCloudSaveDiagnostic("result", {
+        attemptId, payloadBytes, revisionState: cloudRevision.current.kind,
+        revision: cloudRevision.current.kind === "known" ? cloudRevision.current.revision : null,
+        httpStatus: failure?.status, errorType: failure?.kind, durationMs, retryCount: retryCount.current,
+        ...(retryDelay === null ? {} : { backoffMs: retryDelay }), ...(reconciliation ? { reconciliation } : {}),
+      });
+      const nextDelay = retryDelay ?? (!failure && dirty.current ? CLOUD_DELAY_MS : null);
+      if (nextDelay !== null && dirty.current && !conflictPaused.current && !retryPaused.current && cloudSession.current) cloudTimer.current = setTimeout(() => { void flushCloudRef.current(); }, nextDelay);
     }
   }, [acknowledge, showStatus]);
 
@@ -192,6 +267,8 @@ export function useSproutPersistence() {
           latest.current = localSave;
           dirty.current = Boolean(localSave);
           conflictPaused.current = false;
+          retryPaused.current = false;
+          retryCount.current = 0;
           setHydration({ complete: true, save: localSave });
           showStatus("saving");
           if (localSave) cloudTimer.current = setTimeout(() => { void flushCloudRef.current(); }, 0);
@@ -234,6 +311,8 @@ export function useSproutPersistence() {
     latest.current = { version: 3, savedAt: Date.now(), ...payload };
     dirty.current = true;
     conflictPaused.current = false;
+    retryPaused.current = false;
+    retryCount.current = 0;
     if (localTimer.current) clearTimeout(localTimer.current);
     localTimer.current = setTimeout(flushLocal, LOCAL_DELAY_MS);
     if (cloudSession.current) {
